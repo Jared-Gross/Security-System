@@ -20,20 +20,20 @@ START_TIME = 5
 SEND_EMAIL_DELAY = 10
 TIME = 0
 EMAIL_TIME = 0
-cascadeLocationFolder = "Face Detection/"
+cascadeLocationFolder = ""
 cascadeLists = [
     "{0}haarcascade_frontalface_default.xml".format(cascadeLocationFolder),
     "{0}haarcascade_eye.xml".format(cascadeLocationFolder),
     "{0}haarcascade_fullbody.xml".format(cascadeLocationFolder)
 ]
 selectedCascade = ""
-image_folder = 'Face Detection\\Pics'
+image_folder = 'Pics'
 video_name = 'temp.avi'
 numOfPics = 0
 cascade = cv2.CascadeClassifier(cascadeLists[0])
 cap = cv2.VideoCapture(0)
 vid_cod = cv2.VideoWriter_fourcc(*'XVID')
-output = cv2.VideoWriter("Face Detection/cam_video.mp4", vid_cod, 17.0, (640,480))
+output = cv2.VideoWriter("cam_video.mp4", vid_cod, 17.0, (640,480))
 TIME_LIMIT = 100
 def on_exists(fname):
     if os.path.isfile(fname):
@@ -74,11 +74,11 @@ def savePicture(num):
     if not captureScreen:
         # CAPTURE WEBCAM
         return_value,image = cap.read()
-        cv2.imwrite("Face Detection\\Pics\\{0}.png".format(num),image)
+        cv2.imwrite("Pics/{0}.png".format(num),image)
     else:
         # CAPTURE SCREEN
         with mss.mss() as sct:
-            filename = sct.shot(output=f'Face Detection/Pics/{num}.png')
+            filename = sct.shot(output=f'Pics/{num}.png')
 def btnStop():
     if record_video:
         makeVideo()
@@ -86,7 +86,7 @@ def btnStop():
         clip = mp.VideoFileClip(video_name)
         # make the height 360px ( According to moviePy documenation The width is then computed so that the width/height ratio is conserved.)
         clip_resized = clip.resize(height=360)
-        clip_resized.write_videofile("Face Detection\\output.mp4")
+        clip_resized.write_videofile("output.mp4")
         os.remove(video_name)
         print("Deleted: {0}".format(video_name))
     removePictures()
@@ -116,9 +116,16 @@ def camRun():
             )
             # Draw a rectangle around the faces
             for (x, y, w, h) in faces:
-                cv2.rectangle(frame, (x, y), (x + w, y + h), (255, 0, 0), 2)
-                d = (x + w * 3.14)
-                cv2.circle(frame, int((x + w - d), int(y + h - d)), int(d * d), (255, 0, 0), 2)
+                d = int(w / 2)
+                radius = int(w / 3)
+                # HEAD
+                cv2.circle(frame, (int(x + w / 2), int(y + h / 2)), d, (d, 0, 0), 2)
+                # LEFT EYE
+                cv2.circle(frame, (int(x + w / 4) + 5, int(y + h / 4) + 15), int(d / 4), (d, 0, 0), 2)
+                # RIGHT EYE
+                cv2.circle(frame, (int(x + w / 1.5) + 5, int(y + h / 4) + 15), int(d / 4), (d, 0, 0), 2)
+                # LIPS
+                cv2.ellipse(frame, (int(x + w / 2), int(y + h / 1.9)), (radius, radius), 0, 25, 155, (d, 0, 0), 2)
             # Display the resulting frame
             cv2.imshow('Camera', frame)
             output.write(frame)
@@ -137,10 +144,7 @@ def camRun():
                 savePicture(numOfPics)
                 email_picture(str(numOfPics) + '.png')
                 EMAIL_TIME = 0
-                # x = threading.Thread(target = email_picture(str(numOfPics) + '.png'), args = (1,))
-                # x.start()
-                # x.join()
-                # print("Found {0} faces!".format(len(faces)))
+                print(f'Found {len(faces)} faces!')
 
         if cv2.waitKey(1) & 0xFF == ord('q'):
             btnStop()

@@ -37,5 +37,5 @@ def email_picture(name):
     # Send the email (this example assumes SMTP authentication is required)
     smtp = smtplib.SMTP_SSL('smtp.gmail.com', 465)
     smtp.login(EMAIL, EMAIL_PASSWORD)
-    smtp.sendmail(strFrom, strTo, msgRoot.as_string())
+    smtp.sendmail(EMAIL, EMAIL_TO, msgRoot.as_string())
     smtp.quit()

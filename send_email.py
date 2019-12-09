@@ -10,7 +10,7 @@ def email_picture(name):
 
     # Create the root message and fill in the from, to, and subject headers
     msgRoot = MIMEMultipart('related')
-    msgRoot['Subject'] = 'Jared Room ALERT!'
+    msgRoot['Subject'] = 'ALERT!'
     msgRoot['From'] = EMAIL
     msgRoot['To'] = EMAIL_TO
     msgRoot.preamble = 'This is a multi-part message in MIME format.'

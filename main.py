@@ -117,15 +117,14 @@ def camRun():
             # Draw a rectangle around the faces
             for (x, y, w, h) in faces:
                 d = int(w / 2)
-                radius = int(w / 3)
-                # HEAD
-                cv2.circle(frame, (int(x + w / 2), int(y + h / 2)), d, (d, 0, 0), 2)
+                # HEADd
+                cv2.circle(frame, (int(x + w / 2), int(y + h / 2)), d, (d, int(d / 2), int(w)), 2)
                 # LEFT EYE
-                cv2.circle(frame, (int(x + w / 4) + 5, int(y + h / 4) + 15), int(d / 4), (d, 0, 0), 2)
+                cv2.circle(frame, (int(x + w / 4) + 5, int(y + h / 4) + 15), int(d / 4), (d, int(d / 2), int(w)), 2)
                 # RIGHT EYE
-                cv2.circle(frame, (int(x + w / 1.5) + 5, int(y + h / 4) + 15), int(d / 4), (d, 0, 0), 2)
+                cv2.circle(frame, (int(x + w / 1.5) + 5, int(y + h / 4) + 15), int(d / 4), (d, int(d / 2), int(w)), 2)
                 # LIPS
-                cv2.ellipse(frame, (int(x + w / 2), int(y + h / 1.9)), (radius, radius), 0, 25, 155, (d, 0, 0), 2)
+                cv2.ellipse(frame, (int(x + w / 2), int(y + h / 1.9)), (int(w / 3), int(w / 3)), 0, 25, 155, (d, int(d / 2), int(w)), 2)
             # Display the resulting frame
             cv2.imshow('Camera', frame)
             output.write(frame)

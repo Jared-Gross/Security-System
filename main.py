@@ -12,11 +12,10 @@ from threading import Timer
 # captureScreen = IntVar()
 captureScreen = False
 record_video = False
-email_pictures = True
+email_pictures = False
 
 canvas_height=200
 canvas_width=200
-cap = cv2.VideoCapture(0)
 START_TIME = 5
 SEND_EMAIL_DELAY = 10
 TIME = 0
@@ -32,6 +31,7 @@ image_folder = 'Face Detection\\Pics'
 video_name = 'temp.avi'
 numOfPics = 0
 cascade = cv2.CascadeClassifier(cascadeLists[0])
+cap = cv2.VideoCapture(0)
 vid_cod = cv2.VideoWriter_fourcc(*'XVID')
 output = cv2.VideoWriter("Face Detection/cam_video.mp4", vid_cod, 17.0, (640,480))
 TIME_LIMIT = 100
@@ -116,8 +116,9 @@ def camRun():
             )
             # Draw a rectangle around the faces
             for (x, y, w, h) in faces:
-                cv2.rectangle(frame, (x, y), (x+w, y+h), (0, 255, 0), 2)
-
+                cv2.rectangle(frame, (x, y), (x + w, y + h), (255, 0, 0), 2)
+                d = (x + w * 3.14)
+                cv2.circle(frame, int((x + w - d), int(y + h - d)), int(d * d), (255, 0, 0), 2)
             # Display the resulting frame
             cv2.imshow('Camera', frame)
             output.write(frame)

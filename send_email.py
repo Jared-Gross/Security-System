@@ -7,8 +7,6 @@ def email_picture(name):
     EMAIL = 'xxxxxxxxxxxxxx@gmail.com'
     EMAIL_TO = 'yyyyyyyyyyyy@gmail.com'
     EMAIL_PASSWORD = YOUR_EMAIL_PASSWORD
-    strFrom = EMAIL
-    strTo = EMAIL_TO
 
     # Create the root message and fill in the from, to, and subject headers
     msgRoot = MIMEMultipart('related')

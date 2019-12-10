@@ -4,9 +4,10 @@ from email.mime.image import MIMEImage
 from email.mime.multipart import MIMEMultipart
 from datetime import datetime
 def email_picture(name):
+    #IMPORT FIELDS!!
     EMAIL = 'xxxxxxxxxxxxxx@gmail.com'
     EMAIL_TO = 'yyyyyyyyyyyy@gmail.com'
-    EMAIL_PASSWORD = YOUR_EMAIL_PASSWORD
+    EMAIL_PASSWORD = 'YOUR_EMAIL_PASSWORD'
 
     # Create the root message and fill in the from, to, and subject headers
     msgRoot = MIMEMultipart('related')
@@ -20,17 +21,15 @@ def email_picture(name):
     msgAlternative = MIMEMultipart('alternative')
     msgRoot.attach(msgAlternative)
     # We reference the image in the IMG SRC attribute by the ID we give it below
-    msgText = MIMEText(f'{datetime.now()}\n<br><img src="cid:image1"><br>', 'html')
+    msgText = MIMEText(f'{datetime.now()}\n<br><img src="cid:image1"><img src="cid:image2"><br>', 'html')
     msgAlternative.attach(msgText)
 
-    # This example assumes the image is in the current directory
-    fp = open(f'{os.path.dirname(os.path.realpath(__file__))}/Pics/{name}', 'rb')
-    msgImage = MIMEImage(fp.read())
-    fp.close()
-
     # Define the image's ID as referenced above
-    msgImage.add_header('Content-ID', '<image1>')
-    msgRoot.attach(msgImage)
+    for i, j in enumerate(name):
+        with open(f'{os.path.dirname(os.path.realpath(__file__))}/Pics/{name[i]}', 'rb') as fp:
+            msgImage = MIMEImage(fp.read())
+            msgImage.add_header('Content-ID', f'<image>{i}')
+            msgRoot.attach(msgImage)
 
     # Send the email (this example assumes SMTP authentication is required)
     smtp = smtplib.SMTP_SSL('smtp.gmail.com', 465)

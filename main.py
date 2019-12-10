@@ -8,12 +8,15 @@ import natsort as nt
 from datetime import datetime
 from send_email import email_picture
 from threading import Timer
+from Controll_Panel import isActive
 # captureScreen = IntVar()
 captureScreen = False
 record_video = False
 email_pictures = True
 
 SMILEY_FACE = False
+
+isRunning = False
 
 canvas_height=200
 canvas_width=200
@@ -32,7 +35,7 @@ image_folder = 'Face Detection/Pics'
 video_name = 'temp.avi'
 numOfPics = 0
 cascade = cv2.CascadeClassifier(cascadeLists[0])
-cap = cv2.VideoCapture(0)
+cap = cv2.VideoCapture(0 + cv2.CAP_DSHOW)
 vid_cod = cv2.VideoWriter_fourcc(*'XVID')
 output = cv2.VideoWriter("cam_video.mp4", vid_cod, 17.0, (640,480))
 TIME_LIMIT = 100
@@ -69,28 +72,31 @@ def savePicture(num):
         with mss.mss() as sct:
             filename = sct.shot(output=f'Face Detection/Pics/{num}.png')
 def findFaceInImage(num):
-    cropped_image_name = 'Cropped Image.png'
-    image_name = 'Image.png'
-    img = cv2.imread(f'Face Detection/Pics/{num}.png')
+    try:
+        cropped_image_name = 'Cropped Image.png'
+        image_name = 'Image.png'
+        img = cv2.imread(f'Face Detection/Pics/{num}.png')
 
-    gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
-    faces = cascade.detectMultiScale(
-        gray,
-        scaleFactor=1.2,
-        minNeighbors=5,
-        minSize=(30, 30)
-    )
-    print ("Found {0} faces!".format(len(faces)))
+        gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
+        faces = cascade.detectMultiScale(
+            gray,
+            scaleFactor=1.2,
+            minNeighbors=5,
+            minSize=(30, 30)
+        )
+        print ("Found {0} faces!".format(len(faces)))
 
-    # Draw a rectangle around the faces
-    for (x, y, w, h) in faces:
-        cv2.rectangle(img, (x, y), (x+w, y+h), (0, 255, 0), 2)
-    img_cropped = cv2.imread(f'Face Detection/Pics/{num}.png')
-    crop_img = img_cropped[y:y+h, x:x+w]
-    cv2.imwrite(f'Face Detection/Pics/{image_name}', img)
-    cv2.imwrite(f'Face Detection/Pics/{cropped_image_name}', crop_img)
-    threading.Thread(target=email_picture, args=([image_name, cropped_image_name],)).start()
-
+        # Draw a rectangle around the faces
+        for (x, y, w, h) in faces:
+            cv2.rectangle(img, (x, y), (x+w, y+h), (0, 255, 0), 2)
+        img_cropped = cv2.imread(f'Face Detection/Pics/{num}.png')
+        crop_img = img_cropped[y:y+h, x:x+w]
+        cv2.imwrite(f'Face Detection/Pics/{image_name}', img)
+        cv2.imwrite(f'Face Detection/Pics/{cropped_image_name}', crop_img)
+        print('Image Processed')
+        threading.Thread(target=email_picture, args=([image_name, cropped_image_name],)).start()
+    except Exception as e:
+        print(e)
 def btnStop():
     if record_video:
         makeVideo()
@@ -106,7 +112,7 @@ def btnStop():
     print('closed capture')
     cv2.destroyAllWindows()
     print('closed all windows')
-    sys.exit()
+    # sys.exit()
 def camRun():
     print("Starting..")
     global TIME, EMAIL_TIME
@@ -161,13 +167,28 @@ def camRun():
                 # WAIT FOR PROCCESS TO FINISH:
                 # PROCESS_IMAGE.join()
 
+        if isActive == True:
+            print('Quit by isActive')
+            break
+            # btnStop()
+        if isRunning == True:
+            print('Quit by isRunning')
+            break
+            btnStop()
         if cv2.waitKey(1) & 0xFF == ord('q'):
             btnStop()
 def exit_handler():
     print('Closing.. please wait.')
     btnStop()
 
-if __name__ == '__main__':
-    atexit.register(exit_handler)
+def start_cam():
+    print('start_cam')
+    # atexit.register(exit_handler)
     # START_CAMERA = threading.Thread(target=camRun).start()
-    START_CAMERA = Process(target=camRun).start()
+    isRunning = True
+    # START_CAMERA = Process(target=camRun).start()
+    camRun()
+def end_cam():
+    print('End_cam')
+    isRunning = False
+    btnStop()

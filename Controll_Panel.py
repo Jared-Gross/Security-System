@@ -11,10 +11,10 @@ class MainMenu(QWidget):
         super(MainMenu, self).__init__(parent)
         self.setWindowTitle('Control Panel')
         grid = QGridLayout()
+        grid.addWidget(self.DelayGroup(), 0, 0)
         grid.addWidget(self.ComboBox(), 1, 0)
         grid.addWidget(self.CheckGroup(), 0, 1)
-        grid.addWidget(self.DelayGroup(), 0, 0)
-        # grid.addWidget(self.createExampleGroup(), 1, 1)
+        grid.addWidget(self.Controll(), 1, 1)
         self.setLayout(grid)
 
         self.setMinimumSize(400, 300)
@@ -58,6 +58,8 @@ class MainMenu(QWidget):
 
         Labe3 = QLabel('Box Color:')
         ColorDialog = QPushButton('Color')
+        ColorDialog.setStyleSheet("QPushButton { background-color: blue }"
+                                "QPushButton:pressed { background-color: red }" )
         ColorDialog.clicked.connect(self.Open_Color_Dialog)
 
         vbox = QVBoxLayout()
@@ -67,6 +69,17 @@ class MainMenu(QWidget):
         vbox.addWidget(ImageDelay)
         vbox.addWidget(Labe3)
         vbox.addWidget(ColorDialog)
+        vbox.addStretch(1)
+        groupBox.setLayout(vbox)
+
+        return groupBox
+    def Controll(self):
+        groupBox = QGroupBox("Start")
+
+        button = QPushButton('Start')
+
+        vbox = QVBoxLayout()
+        vbox.addWidget(button)
         vbox.addStretch(1)
         groupBox.setLayout(vbox)
 

@@ -129,6 +129,7 @@ def findFaceInImage(num):
     email_pictures = (True if send_email[0] == 'True' else False)
     print(cascade_files[selected_data_index[0]])
     cascade = cv2.CascadeClassifier(cascade_files[selected_data_index[0]])
+    eye_cascade = cv2.CascadeClassifier(cascade_files[0])
     red, green, blue = int(saved_color[2]), int(saved_color[1]), int(saved_color[0])
     try:
         cropped_image_name = 'Cropped Image.png'
@@ -150,12 +151,19 @@ def findFaceInImage(num):
                         d = int(w / 2)
                         # HEAD
                         cv2.circle(img, (int(x + w / 2), int(y + h / 2)), d, (red, green, blue), 2)
+                        # EYES
+                        roi_gray = gray[y:y+h, x:x+w]
+                        roi_color = img[y:y+h, x:x+w]
+                        eyes = eye_cascade.detectMultiScale(roi_gray)
+                        for (ex,ey,ew,eh) in eyes:
+                            d = int(ew / 2)
+                            cv2.circle(roi_color, (int(ex + ew / 4) + 5, int(ey + eh / 4) + 15), int(d) ,(blue,green,red),2)
                         # LEFT EYE
-                        cv2.circle(img, (int(x + w / 4) + 5, int(y + h / 4) + 15), int(d / 4), (red, green, blue), 2)
+                        # cv2.circle(img, (int(x + w / 4) + 5, int(y + h / 4) + 15), int(d / 4), (red, green, blue), 2)
                         # RIGHT EYE
-                        cv2.circle(img, (int(x + w / 1.5) + 5, int(y + h / 4) + 15), int(d / 4), (red, green, blue), 2)
+                        # cv2.circle(img, (int(x + w / 1.5) + 5, int(y + h / 4) + 15), int(d / 4), (red, green, blue), 2)
                         # LIPS
-                        cv2.ellipse(img, (int(x + w / 2), int(y + h / 1.9)), (int(w / 3), int(w / 3)), 0, 25, 155, (red, green, blue), 2)
+                        cv2.ellipse(img, (int(x + w / 2), int(y + h / 2.2)), (int(w / 3), int(w / 3)), 0, 25, 155, (red, green, blue), 2)
                     else:
                         cv2.rectangle(img, (x, y), (x+w, y+h), (red, green, blue), 2)
                 img_cropped = cv2.imread(f'Face Detection/Pics/{num}.png')
@@ -185,6 +193,8 @@ def camRun():
     global saved_color, send_email, cap_screen, record_video, smiley_face, dark_mode, email_delay, picture_delay, saved_color, settings_json, selected_data_index, red, green, blue
     print("Starting..")
     threading.Thread(target = update_variables).start()
+    eye_cascade = cv2.CascadeClassifier(cascade_files[0])
+                #   cv2.CascadeClassifier(cascade_files[int(selected_data_index[0])])
     while isRunning:
         # Capture frame-by-frame
         ret, frame = cap.read()
@@ -204,12 +214,19 @@ def camRun():
                     d = int(w / 2)
                     # HEAD
                     cv2.circle(frame, (int(x + w / 2), int(y + h / 2)), d, (red, green, blue), 2)
-                    # LEFT EYE
-                    cv2.circle(frame, (int(x + w / 4) + 5, int(y + h / 4) + 15), int(d / 4), (red, green, blue), 2)
+                    # EYES
+                    roi_gray = gray[y:y+h, x:x+w]
+                    roi_color = frame[y:y+h, x:x+w]
+                    eyes = eye_cascade.detectMultiScale(roi_gray)
+                    for (ex,ey,ew,eh) in eyes:
+                        d = int(ew / 2)
+                        # cv2.rectangle(roi_color,(ex,ey),(ex+ew,ey+eh),(blue,green,red),2)
+                        cv2.circle(roi_color, (int(ex + ew / 4) + 5, int(ey + eh / 4) + 15), int(d) ,(blue,green,red),2)
+                        # cv2.circle(frame, (int(x + w / 4) + 5, int(y + h / 4) + 15), int(d / 4), (red, green, blue), 2)
                     # RIGHT EYE
-                    cv2.circle(frame, (int(x + w / 1.5) + 5, int(y + h / 4) + 15), int(d / 4), (red, green, blue), 2)
+                    # cv2.circle(frame, (int(x + w / 1.5) + 5, int(y + h / 4) + 15), int(d / 4), (red, green, blue), 2)
                     # LIPS
-                    cv2.ellipse(frame, (int(x + w / 2), int(y + h / 1.9)), (int(w / 3), int(w / 3)), 0, 25, 155, (red, green, blue), 2)
+                    cv2.ellipse(frame, (int(x + w / 2), int(y + h / 2.2)), (int(w / 3), int(w / 3)), 0, 25, 155, (red, green, blue), 2)
                 else:
                     cv2.rectangle(frame, (x, y), (x+w, y+h), (red, green, blue), 2)
             # Display the resulting frame

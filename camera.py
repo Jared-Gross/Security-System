@@ -16,8 +16,6 @@ email_pictures = True
 
 SMILEY_FACE = False
 
-isRunning = Controll_Panel.getBool()
-
 canvas_height=200
 canvas_width=200
 START_TIME = 5

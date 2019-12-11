@@ -130,6 +130,7 @@ def findFaceInImage(num):
     print(cascade_files[selected_data_index[0]])
     cascade = cv2.CascadeClassifier(cascade_files[selected_data_index[0]])
     eye_cascade = cv2.CascadeClassifier(cascade_files[0])
+    mouth_cascade = cv2.CascadeClassifier(cascade_files[17])
     red, green, blue = int(saved_color[2]), int(saved_color[1]), int(saved_color[0])
     try:
         cropped_image_name = 'Cropped Image.png'
@@ -151,19 +152,21 @@ def findFaceInImage(num):
                         d = int(w / 2)
                         # HEAD
                         cv2.circle(img, (int(x + w / 2), int(y + h / 2)), d, (red, green, blue), 2)
+                        # MOUTH
+                        roi_gray_mouth = gray[y+(int(h/2)):y+h, x:x+w]
+                        roi_color_mouth = img[y+(int(h/2)):y+h, x:x+w]
+                        mouth = mouth_cascade.detectMultiScale(roi_gray_mouth)
+                        
                         # EYES
-                        roi_gray = gray[y:y+h, x:x+w]
-                        roi_color = img[y:y+h, x:x+w]
-                        eyes = eye_cascade.detectMultiScale(roi_gray)
+                        roi_gray_eye = gray[y-(int(h/2)):y+h, x:x+w]
+                        roi_color_eye = img[y-(int(h/2)):y+h, x:x+w]
+                        eyes = eye_cascade.detectMultiScale(roi_gray_eye)
+                        
                         for (ex,ey,ew,eh) in eyes:
                             d = int(ew / 2)
-                            cv2.circle(roi_color, (int(ex + ew / 4) + 5, int(ey + eh / 4) + 15), int(d) ,(blue,green,red),2)
-                        # LEFT EYE
-                        # cv2.circle(img, (int(x + w / 4) + 5, int(y + h / 4) + 15), int(d / 4), (red, green, blue), 2)
-                        # RIGHT EYE
-                        # cv2.circle(img, (int(x + w / 1.5) + 5, int(y + h / 4) + 15), int(d / 4), (red, green, blue), 2)
-                        # LIPS
-                        cv2.ellipse(img, (int(x + w / 2), int(y + h / 2.2)), (int(w / 3), int(w / 3)), 0, 25, 155, (red, green, blue), 2)
+                            cv2.circle(roi_color_eye, (int(ex + ew / 4) + int(d / 2), int(ey + eh / 4) + int(d / 2)), int(d) ,(blue,green,red),2)
+                        for (ex,ey,ew,eh) in mouth:
+                            cv2.ellipse(roi_color_mouth, (int(ex + ew / 2), int(ey + eh / 2)), (int(ew / 3), int(ew / 12)), 0, 25, 155, (blue,green,red), 2)
                     else:
                         cv2.rectangle(img, (x, y), (x+w, y+h), (red, green, blue), 2)
                 img_cropped = cv2.imread(f'Face Detection/Pics/{num}.png')
@@ -194,7 +197,7 @@ def camRun():
     print("Starting..")
     threading.Thread(target = update_variables).start()
     eye_cascade = cv2.CascadeClassifier(cascade_files[0])
-                #   cv2.CascadeClassifier(cascade_files[int(selected_data_index[0])])
+    mouth_cascade = cv2.CascadeClassifier(cascade_files[17])
     while isRunning:
         # Capture frame-by-frame
         ret, frame = cap.read()
@@ -215,18 +218,19 @@ def camRun():
                     # HEAD
                     cv2.circle(frame, (int(x + w / 2), int(y + h / 2)), d, (red, green, blue), 2)
                     # EYES
-                    roi_gray = gray[y:y+h, x:x+w]
-                    roi_color = frame[y:y+h, x:x+w]
-                    eyes = eye_cascade.detectMultiScale(roi_gray)
+                    roi_gray_mouth = gray[y+(int(h/2)):y+h, x:x+w]
+                    roi_color_mouth = frame[y+(int(h/2)):y+h, x:x+w]
+                    
+                    roi_gray_eye = gray[y-(int(h/2)):y+h, x:x+w]
+                    roi_color_eye = frame[y-(int(h/2)):y+h, x:x+w]
+                    eyes = eye_cascade.detectMultiScale(roi_gray_eye)
+                    mouth = mouth_cascade.detectMultiScale(roi_gray_mouth)
                     for (ex,ey,ew,eh) in eyes:
                         d = int(ew / 2)
-                        # cv2.rectangle(roi_color,(ex,ey),(ex+ew,ey+eh),(blue,green,red),2)
-                        cv2.circle(roi_color, (int(ex + ew / 4) + 5, int(ey + eh / 4) + 15), int(d) ,(blue,green,red),2)
-                        # cv2.circle(frame, (int(x + w / 4) + 5, int(y + h / 4) + 15), int(d / 4), (red, green, blue), 2)
-                    # RIGHT EYE
-                    # cv2.circle(frame, (int(x + w / 1.5) + 5, int(y + h / 4) + 15), int(d / 4), (red, green, blue), 2)
-                    # LIPS
-                    cv2.ellipse(frame, (int(x + w / 2), int(y + h / 2.2)), (int(w / 3), int(w / 3)), 0, 25, 155, (red, green, blue), 2)
+                        cv2.circle(roi_color_eye, (int(ex + ew / 4) + int(d / 2), int(ey + eh / 4) + int(d / 2)), int(d) ,(blue,green,red),2)
+                    for (ex,ey,ew,eh) in mouth:
+                        # LIPS
+                        cv2.ellipse(roi_color_mouth, (int(ex + ew / 2), int(ey + eh / 2)), (int(ew / 3), int(ew / 12)), 0, 25, 155, (blue,green,red), 2)
                 else:
                     cv2.rectangle(frame, (x, y), (x+w, y+h), (red, green, blue), 2)
             # Display the resulting frame

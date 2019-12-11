@@ -8,7 +8,7 @@ import sys, os, shutil, json, multiprocessing, cv2, threading
 from os import listdir
 from os.path import isfile, join
 # CAMERA SCRIPT
-import live
+import camera
 settings_file = os.path.dirname(os.path.realpath(__file__)) + '/settings.json'
 settings_json = []
 
@@ -49,6 +49,7 @@ class MainMenu(QWidget):
         for i, j in enumerate(cascade_files):
             j = j.replace('haarcascade_', '')
             j = j.replace('.xml', '')
+            j = j.replace('_', ' ')
             self.cascadeList.addItem(j)
         self.cascadeList.setCurrentIndex(int(selected_data_index[0]))
         self.cascadeList.currentTextChanged.connect(self.comboBoxChanged)
@@ -515,7 +516,7 @@ class MainMenu(QWidget):
             self.start.setIcon(self.style().standardIcon(getattr(QStyle, 'SP_MediaPlay')))
             self.setWindowIcon(self.style().standardIcon(getattr(QStyle, 'SP_DialogNoButton')))
             # multiprocessing.Process(target=live.end_cam).start()
-            # live.end_cam()linear-gradient(to right, black 0%, white 100%)
+            camera.end_cam()
         else:
             self.start.setStyleSheet('background-color: rgb(106, 11, 11)')
             self.start.setIcon(self.style().standardIcon(getattr(QStyle, 'SP_MediaStop')))
@@ -523,12 +524,10 @@ class MainMenu(QWidget):
             self.start.setText('Stop')
             print('closed capture')
             cv2.destroyAllWindows()
-            # live.start_cam()
+            camera.start_cam()
             # multiprocessing.Process(target=live.start_cam).start()
         # print(isActive)
-def getBool():
-    print(isActive)
-    return isActive
+
 if __name__ == '__main__':
     if os.path.exists(settings_file):
         with open(settings_file) as file:

@@ -1,20 +1,39 @@
-from PyQt5.QtMultimediaWidgets import *
-from PyQt5.QtMultimedia import *
-from PyQt5.QtWidgets import *
-from PyQt5.QtCore import *
-from PyQt5.QtGui import *
-from PyQt5 import *
-import sys, os, shutil, json, multiprocessing, cv2, threading
-from os import listdir
+import cv2, mss, os, os.path, shutil, time, logging, threading, time, sys, atexit, json
+from multiprocessing import Process
 from os.path import isfile, join
-# CAMERA SCRIPT
-import live
-settings_file = os.path.dirname(os.path.realpath(__file__)) + '/settings.json'
-settings_json = []
+from PIL import Image, ImageGrab
+import moviepy.editor as mp
+from datetime import datetime
+import natsort as nt
+from datetime import datetime
+from send_email import email_picture
+from threading import Timer
+import Controll_Panel
+# captureScreen = IntVar()
+captureScreen = False
+recording = False
+email_pictures = True
+
+SMILEY_FACE = False
+
+isRunning = Controll_Panel.getBool()
+
+canvas_height=200
+canvas_width=200
+START_TIME = 5
+SEND_EMAIL_DELAY = 10
+TIME = 0
+EMAIL_TIME = 0
 
 cascade_files_dir = os.path.dirname(os.path.realpath(__file__)) + '/Data Models'
-cascade_files = [f for f in listdir(cascade_files_dir) if isfile(join(cascade_files_dir, f))]
-isActive = False
+cascade_files = []
+for r, d, f in os.walk(cascade_files_dir):
+    for file in f:
+        if '.xml' in file:
+            cascade_files.append(os.path.join(r, file))
+
+settings_file = os.path.dirname(os.path.realpath(__file__)) + '/settings.json'
+settings_json = []
 
 saved_color = []
 send_email = []
@@ -26,541 +45,222 @@ dark_mode = []
 email_delay = []
 picture_delay = []
 selected_data_index = []
-button_css = ''
 
-class MainMenu(QWidget):
-    def __init__(self, parent = None):
-        super(MainMenu, self).__init__(parent)
-        self.setWindowTitle('Control Panel')
-        self.setWindowIcon(self.style().standardIcon(getattr(QStyle, 'SP_DialogNoButton')))
-        grid = QGridLayout()
-        grid.addWidget(self.DelayGroup(), 0, 0)
-        grid.addWidget(self.ComboBox(), 1, 0)
-        grid.addWidget(self.CheckGroup(), 0, 1)
-        grid.addWidget(self.Controll(), 1, 1)
-        self.setLayout(grid)
+red, green, blue = 0, 0, 0
 
-        self.setMinimumSize(400, 260)
-    def ComboBox(self):
-        global selected_data_index
-        groupBox = QGroupBox("Recognition type")
+image_folder = 'Face Detection/Pics'
+video_name = os.path.dirname(os.path.realpath(__file__)) + '/temp.avi'
+numOfPics = 0
+cascade = cv2.CascadeClassifier(cascade_files[0])
+cap = cv2.VideoCapture(0)
+vid_cod = cv2.VideoWriter_fourcc(*'XVID')
+output = cv2.VideoWriter(os.path.dirname(os.path.realpath(__file__)) + "/cam_video.mp4", vid_cod, 17, (640,480))
+TIME_LIMIT = 100
+def removePictures():
+    for the_file in os.listdir(image_folder):
+        file_path = os.path.join(image_folder, the_file)
+        try:
+            if os.path.isfile(file_path):
+                os.unlink(file_path)
+        except Exception as e:
+            print(e)
+def makeVideo():
+    images = [img for img in os.listdir(image_folder) if img.endswith(".png")]
+    if len(images) == 0:
+        print('No Images Found')
+        return
+    else:
+        images = nt.natsorted(images)
+        frame = cv2.imread(os.path.join(image_folder, images[0]))
+        height, width, layers = frame.shape
+        video = cv2.VideoWriter(video_name, 0, 17, (width, height))
+        for image in images:
+            video.write(cv2.imread(os.path.join(image_folder, image)))
+        video.release()
+        print(len(images))
+def savePicture(num):
+    if not captureScreen:
+        # CAPTURE WEBCAM
+        return_value, image = cap.read()
+        cv2.imwrite("Face Detection/Pics/{0}.png".format(num),image)
+    else:
+        # CAPTURE SCREEN
+        with mss.mss() as sct:
+            filename = sct.shot(output=f'Face Detection/Pics/{num}.png')
+def findFaceInImage(num):
+    global TIME, EMAIL_TIME, numOfPics, captureScreen, recording, email_pictures, SMILEY_FACE, SEND_EMAIL_DELAY, START_TIME, cascade
+    global saved_color, send_email, cap_screen, record_video, smiley_face, dark_mode, email_delay, picture_delay, saved_color, settings_json, selected_data_index, red, green, blue
+    saved_color.clear()
+    send_email.clear()
+    cap_screen.clear()
+    record_video.clear()
+    smiley_face.clear()
+    dark_mode.clear()
+    email_delay.clear()
+    picture_delay.clear()
+    with open(settings_file) as file:
+        settings_json = json.load(file)
+        for info in settings_json:
+            for color in info['saved color']:
+                saved_color.append(color)
+            for screen in info['capture screen']:
+                cap_screen.append(screen)
+            for video in info['record video']:
+                record_video.append(video)
+            for email in info['send email']:
+                send_email.append(email)
+            for smile in info['smiley face']:
+                smiley_face.append(smile)
+            for dark in info['dark mode']:
+                dark_mode.append(dark)
+            for email_d in info['email delay']:
+                email_delay.append(email_d)
+            for picture in info['picture delay']:
+                picture_delay.append(picture)
+            for ind in info['selected data index']:
+                selected_data_index.append(ind)
+    print("Starting..")
+    print(isRunning)
+    START_TIME = int(picture_delay[0])
+    SEND_EMAIL_DELAY = int(email_delay[0])
+    SMILEY_FACE = (True if smiley_face[0] == 'True' else False)
+    captureScreen = (True if cap_screen[0] == 'True' else False)
+    recording = (True if record_video[0] == 'True' else False)
+    email_pictures = (True if send_email[0] == 'True' else False)
+    print(cascade_files[selected_data_index[0]])
+    cascade = cv2.CascadeClassifier(cascade_files[selected_data_index[0]])
+    red, green, blue = int(saved_color[2]), int(saved_color[1]), int(saved_color[0])
+    try:
+        cropped_image_name = 'Cropped Image.png'
+        image_name = 'Image.png'
+        img = cv2.imread(f'Face Detection/Pics/{num}.png')
+        if img.any() or img.all():
+            gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
+            faces = cascade.detectMultiScale(
+                gray,
+                scaleFactor=1.1,
+                minNeighbors=5,
+                minSize=(30, 30)
+            )
+            print ("Found {0} faces!".format(len(faces)))
+            if len(faces) >= 1:
+                # Draw a rectangle around the faces
+                for (x, y, w, h) in faces:
+                    if SMILEY_FACE:
+                        d = int(w / 2)
+                        # HEAD
+                        cv2.circle(img, (int(x + w / 2), int(y + h / 2)), d, (red, green, blue), 2)
+                        # LEFT EYE
+                        cv2.circle(img, (int(x + w / 4) + 5, int(y + h / 4) + 15), int(d / 4), (red, green, blue), 2)
+                        # RIGHT EYE
+                        cv2.circle(img, (int(x + w / 1.5) + 5, int(y + h / 4) + 15), int(d / 4), (red, green, blue), 2)
+                        # LIPS
+                        cv2.ellipse(img, (int(x + w / 2), int(y + h / 1.9)), (int(w / 3), int(w / 3)), 0, 25, 155, (red, green, blue), 2)
+                    else:
+                        cv2.rectangle(img, (x, y), (x+w, y+h), (red, green, blue), 2)
+                img_cropped = cv2.imread(f'Face Detection/Pics/{num}.png')
+                crop_img = img_cropped[y:y+h, x:x+w]
+                cv2.imwrite(f'Face Detection/Pics/{image_name}', img)
+                cv2.imwrite(f'Face Detection/Pics/{cropped_image_name}', crop_img)
+                print('Image Processed')
+                threading.Thread(target=email_picture, args=([image_name, cropped_image_name],)).start()
+    except Exception as e:
+        print(e)
+def btnStop():
+    if recording:
+        makeVideo()
+        # When everything done, release the capture
+        clip = mp.VideoFileClip(video_name)
+        # make the height 360px ( According to moviePy documenation The width is then computed so that the width/height ratio is conserved.)
+        clip_resized = clip.resize(height=360)
+        clip_resized.write_videofile(os.path.dirname(os.path.realpath(__file__)) + "/output.mp4")
+        os.remove(video_name)
+        print("Deleted: {0}".format(video_name))
+    removePictures()
+    cap.release()
+    cv2.destroyAllWindows()
+    # sys.exit()
+def camRun():
+    global TIME, EMAIL_TIME, numOfPics, captureScreen, recording, email_pictures, SMILEY_FACE, SEND_EMAIL_DELAY, START_TIME, cascade
+    global saved_color, send_email, cap_screen, record_video, smiley_face, dark_mode, email_delay, picture_delay, saved_color, settings_json, selected_data_index, red, green, blue
+    print("Starting..")
+    threading.Thread(target = update_variables).start()
+    while isRunning:
+        # Capture frame-by-frame
+        ret, frame = cap.read()
+        if ret:
+            # Our operations on the frame come here
+            gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
+            # Detect faces in the image
+            faces = cascade.detectMultiScale(
+                gray,
+                scaleFactor=1.1,
+                minNeighbors=5,
+                minSize=(30, 30)
+            )
+            # Draw a rectangle around the faces
+            for (x, y, w, h) in faces:
+                if SMILEY_FACE:
+                    d = int(w / 2)
+                    # HEAD
+                    cv2.circle(frame, (int(x + w / 2), int(y + h / 2)), d, (red, green, blue), 2)
+                    # LEFT EYE
+                    cv2.circle(frame, (int(x + w / 4) + 5, int(y + h / 4) + 15), int(d / 4), (red, green, blue), 2)
+                    # RIGHT EYE
+                    cv2.circle(frame, (int(x + w / 1.5) + 5, int(y + h / 4) + 15), int(d / 4), (red, green, blue), 2)
+                    # LIPS
+                    cv2.ellipse(frame, (int(x + w / 2), int(y + h / 1.9)), (int(w / 3), int(w / 3)), 0, 25, 155, (red, green, blue), 2)
+                else:
+                    cv2.rectangle(frame, (x, y), (x+w, y+h), (red, green, blue), 2)
+            # Display the resulting frame
+            cv2.imshow('Camera', frame)
+            output.write(frame)
 
-        self.cascadeList = QComboBox()
-        for i, j in enumerate(cascade_files):
-            j = j.replace('haarcascade_', '')
-            j = j.replace('.xml', '')
-            self.cascadeList.addItem(j)
-        self.cascadeList.setCurrentIndex(int(selected_data_index[0]))
-        self.cascadeList.currentTextChanged.connect(self.comboBoxChanged)
-        vbox = QVBoxLayout()
-        vbox.addWidget(self.cascadeList)
-        vbox.addStretch(1)
-        groupBox.setLayout(vbox)
+            # If theres a face detected then save a picture of it
+            if len(faces) >= 1:
+                TIME = START_TIME
+            TIME -= 0.2
+            EMAIL_TIME += 0.2
 
-        return groupBox
-    def CheckGroup(self):
-        global saved_color, send_email, cap_screen, record_video, smiley_face, dark_mode
-        groupBox = QGroupBox("Controlls")
+            if TIME >= 0 and recording:
+                numOfPics += 1
+                savePicture(numOfPics)
+            if EMAIL_TIME >= SEND_EMAIL_DELAY and len(faces) >= 1 and not recording and email_pictures:
+                numOfPics += 1
+                EMAIL_TIME = 0
+                print(f'Found {len(faces)} faces! Pictures taken: {numOfPics}')
+                savePicture(numOfPics)
+                PROCESS_IMAGE = threading.Thread(target=findFaceInImage, args=(numOfPics,))
+                PROCESS_IMAGE.start()
+                # WAIT FOR PROCCESS TO FINISH:
+                # PROCESS_IMAGE.join()
 
-        captureScreen = QCheckBox('Capture Screen')
-        captureScreen.setChecked(True if cap_screen[0] == 'True' else False)
-        captureScreen.toggled.connect(lambda:self.checkboxClicked(captureScreen))
-
-        RecordVideo = QCheckBox('Record Video')
-        RecordVideo.setChecked(True if record_video[0] == 'True' else False)
-        RecordVideo.toggled.connect(lambda:self.checkboxClicked(RecordVideo))
-
-        EmailPictures = QCheckBox('Send Emails')
-        EmailPictures.setChecked(True if send_email[0] == 'True' else False)
-        EmailPictures.toggled.connect(lambda:self.checkboxClicked(EmailPictures))
-
-        SmileyFace = QCheckBox('Smiley Face Addon')
-        SmileyFace.setChecked(True if smiley_face[0] == 'True' else False)
-        SmileyFace.toggled.connect(lambda:self.checkboxClicked(SmileyFace))
-
-        DarkTheme = QCheckBox('Dark mode')
-        DarkTheme.setChecked(True if dark_mode[0] == 'True' else False)
-        DarkTheme.toggled.connect(lambda:self.checkboxClicked(DarkTheme))
-
-        vbox = QVBoxLayout()
-        vbox.addWidget(captureScreen)
-        vbox.addWidget(RecordVideo)
-        vbox.addWidget(EmailPictures)
-        vbox.addWidget(SmileyFace)
-        vbox.addWidget(DarkTheme)
-        vbox.addStretch(1)
-        groupBox.setLayout(vbox)
-        return groupBox
-    def DelayGroup(self):
-        global email_delay, picture_delay, saved_color
-        groupBox = QGroupBox("Delays")
-
-        Label1 = QLabel('Email Sending Delay:')
-        self.EmailDelay = QLineEdit(str(email_delay[0]))
-        self.EmailDelay.setValidator(QIntValidator())
-        self.EmailDelay.textChanged.connect(self.lineEditChanged)
-        Labe2 = QLabel('Snap Picture Delay:')
-        self.ImageDelay = QLineEdit(str(picture_delay[0]))
-        self.ImageDelay.setValidator(QIntValidator())
-        self.ImageDelay.textChanged.connect(self.lineEditChanged)
-
-        Labe3 = QLabel('Box Color:')
-
-        self.ColorDialog = QPushButton('Color')
-        self.ColorDialog.setStyleSheet(f"{button_css}")
-        self.ColorDialog.clicked.connect(self.Open_Color_Dialog)
-
-        vbox = QVBoxLayout()
-        vbox.addWidget(Label1)
-        vbox.addWidget(self.EmailDelay)
-        vbox.addWidget(Labe2)
-        vbox.addWidget(self.ImageDelay)
-        vbox.addWidget(Labe3)
-        vbox.addWidget(self.ColorDialog)
-        vbox.addStretch(1)
-        groupBox.setLayout(vbox)
-
-        return groupBox
-    def Controll(self):
-        groupBox = QGroupBox("Start")
-
-        self.start = QPushButton('Start', self)
-        self.start.setStyleSheet('background-color: rgb(26, 80, 9)')
-        self.start.setIcon(self.style().standardIcon(getattr(QStyle, 'SP_MediaPlay')))
-        self.start.clicked.connect(self.startCamera)
-        vbox = QVBoxLayout()
-        vbox.addWidget(self.start)
-        vbox.addStretch(1)
-        groupBox.setLayout(vbox)
-
-        return groupBox
-    def comboBoxChanged(self):
-        global saved_color, send_email, cap_screen, record_video, smiley_face, dark_mode, email_delay, picture_delay, saved_color, settings_json, button_css, selected_data_index
-        settings_json.pop(0)
-        settings_json.append({
-            "saved color": [saved_color[0], saved_color[1], saved_color[2]],
-            "capture screen": [cap_screen[0]],
-            "record video": [record_video[0]],
-            "smiley face": [smiley_face[0]],
-            "dark mode": [dark_mode[0]],
-            "send email": [send_email[0]],
-            "email delay": [email_delay[0]],
-            "picture delay": [picture_delay[0]],
-            "selected data index": [int(self.cascadeList.currentIndex())]
-        })
-        with open(settings_file, mode='w+', encoding='utf-8') as file:
-            json.dump(settings_json, file, ensure_ascii=True, indent=4, sort_keys=False)
-        with open(settings_file) as file:
-            saved_color.clear()
-            send_email.clear()
-            cap_screen.clear()
-            record_video.clear()
-            smiley_face.clear()
-            dark_mode.clear()
-            email_delay.clear()
-            picture_delay.clear()
-            selected_data_index.clear()
-            settings_json = json.load(file)
-            for info in settings_json:
-                for color in info['saved color']:
-                    saved_color.append(color)
-                for screen in info['capture screen']:
-                    cap_screen.append(screen)
-                for video in info['record video']:
-                    record_video.append(video)
-                for email_b in info['send email']:
-                    send_email.append(email_b)
-                for smile in info['smiley face']:
-                    smiley_face.append(smile)
-                for dark in info['dark mode']:
-                    dark_mode.append(dark)
-                for email_d in info['email delay']:
-                    email_delay.append(email_d)
-                for picture in info['picture delay']:
-                    picture_delay.append(picture)
-                for ind in info['selected data index']:
-                    selected_data_index.append(ind)
-
-    def lineEditChanged(self):
-        global saved_color, send_email, cap_screen, record_video, smiley_face, dark_mode, email_delay, picture_delay, saved_color, settings_json, selected_data_index
-
-        if self.ImageDelay.text() == '':
-            return
-        if self.EmailDelay.text() == '':
-            return
-        if int(self.EmailDelay.text()) <= 6:
-            self.EmailDelay.setText('7')
-
-        if int(self.ImageDelay.text()) <= 4:
-            self.ImageDelay.setText('5')
-
-        if int(self.ImageDelay.text()) >= 4 and int(self.EmailDelay.text()) >= 6:
-            settings_json.pop(0)
-            settings_json.append({
-                "saved color": [saved_color[0], saved_color[1], saved_color[2]],
-                "capture screen": [cap_screen[0]],
-                "record video": [record_video[0]],
-                "smiley face": [smiley_face[0]],
-                "dark mode": [dark_mode[0]],
-                "send email": [send_email[0]],
-                "email delay": [int(self.EmailDelay.text())],
-                "picture delay": [int(self.ImageDelay.text())],
-                "selected data index": [selected_data_index[0]]
-            })
-            with open(settings_file, mode='w+', encoding='utf-8') as file:
-                json.dump(settings_json, file, ensure_ascii=True, indent=4, sort_keys=False)
-            with open(settings_file) as file:
-                saved_color.clear()
-                send_email.clear()
-                cap_screen.clear()
-                record_video.clear()
-                smiley_face.clear()
-                dark_mode.clear()
-                email_delay.clear()
-                picture_delay.clear()
-                selected_data_index.clear()
-                settings_json = json.load(file)
-                for info in settings_json:
-                    for color in info['saved color']:
-                        saved_color.append(color)
-                    for screen in info['capture screen']:
-                        cap_screen.append(screen)
-                    for video in info['record video']:
-                        record_video.append(video)
-                    for email_b in info['send email']:
-                        send_email.append(email_b)
-                    for smile in info['smiley face']:
-                        smiley_face.append(smile)
-                    for dark in info['dark mode']:
-                        dark_mode.append(dark)
-                    for email_d in info['email delay']:
-                        email_delay.append(email_d)
-                    for picture in info['picture delay']:
-                        picture_delay.append(picture)
-                    for ind in info['selected data index']:
-                        selected_data_index.append(ind)
-    @pyqtSlot()
-    def Open_Color_Dialog(self):
-        # threading.Thread(target = self.openColorDialog).start()
-        self.openColorDialog()
-    def openColorDialog(self):
-        global saved_color, send_email, cap_screen, record_video, smiley_face, dark_mode, email_delay, picture_delay, saved_color, settings_json, button_css, selected_data_index
-        color = QColorDialog.getColor()
-        if color.isValid():
-            settings_json.pop(0)
-            settings_json.append({
-                "saved color": [color.red(), color.green(), color.blue()],
-                "capture screen": [cap_screen[0]],
-                "record video": [record_video[0]],
-                "smiley face": [smiley_face[0]],
-                "dark mode": [dark_mode[0]],
-                "send email": [send_email[0]],
-                "email delay": [email_delay[0]],
-                "picture delay": [picture_delay[0]],
-                "selected data index": [selected_data_index[0]]
-            })
-            with open(settings_file, mode='w+', encoding='utf-8') as file:
-                json.dump(settings_json, file, ensure_ascii=True, indent=4, sort_keys=False)
-            with open(settings_file) as file:
-                saved_color.clear()
-                send_email.clear()
-                cap_screen.clear()
-                record_video.clear()
-                smiley_face.clear()
-                dark_mode.clear()
-                email_delay.clear()
-                picture_delay.clear()
-                selected_data_index.clear()
-                settings_json = json.load(file)
-                for info in settings_json:
-                    for color in info['saved color']:
-                        saved_color.append(color)
-                    for screen in info['capture screen']:
-                        cap_screen.append(screen)
-                    for video in info['record video']:
-                        record_video.append(video)
-                    for email_b in info['send email']:
-                        send_email.append(email_b)
-                    for smile in info['smiley face']:
-                        smiley_face.append(smile)
-                    for dark in info['dark mode']:
-                        dark_mode.append(dark)
-                    for email_d in info['email delay']:
-                        email_delay.append(email_d)
-                    for picture in info['picture delay']:
-                        picture_delay.append(picture)
-                    for ind in info['selected data index']:
-                        selected_data_index.append(ind)
-
-        button_css = 'QPushButton {background-color: rgb(' + str(saved_color[0]) + ', ' + str(saved_color[1]) + ', ' + str(saved_color[2]) + ');}'
-        self.ColorDialog.setStyleSheet(button_css)
-    def checkboxClicked(self,b):
-        global saved_color, send_email, cap_screen, record_video, smiley_face, dark_mode, email_delay, picture_delay, saved_color, settings_json, selected_data_index
-        if b.text() == "Capture Screen":
-            if b.isChecked() == True:
-                settings_json.pop(0)
-                settings_json.append({
-                    "saved color": [saved_color[0], saved_color[1], saved_color[2]],
-                    "capture screen": ["True"],
-                    "record video": [record_video[0]],
-                    "smiley face": [smiley_face[0]],
-                    "dark mode": [dark_mode[0]],
-                    "send email": [send_email[0]],
-                    "email delay": [email_delay[0]],
-                    "picture delay": [picture_delay[0]],
-                    "selected data index": [selected_data_index[0]]
-                })
-                with open(settings_file, mode='w+', encoding='utf-8') as file:
-                    json.dump(settings_json, file, ensure_ascii=True, indent=4, sort_keys=False)
-            else:
-                settings_json.pop(0)
-                settings_json.append({
-                    "saved color": [saved_color[0], saved_color[1], saved_color[2]],
-                    "capture screen": ["False"],
-                    "record video": [record_video[0]],
-                    "smiley face": [smiley_face[0]],
-                    "dark mode": [dark_mode[0]],
-                    "send email": [send_email[0]],
-                    "email delay": [email_delay[0]],
-                    "picture delay": [picture_delay[0]],
-                    "selected data index": [selected_data_index[0]]
-                })
-                with open(settings_file, mode='w+', encoding='utf-8') as file:
-                    json.dump(settings_json, file, ensure_ascii=True, indent=4, sort_keys=False)
-        if b.text() == "Record Video":
-            if b.isChecked() == True:
-                settings_json.pop(0)
-                settings_json.append({
-                    "saved color": [saved_color[0], saved_color[1], saved_color[2]],
-                    "capture screen": [cap_screen[0]],
-                    "record video": ['True'],
-                    "smiley face": [smiley_face[0]],
-                    "dark mode": [dark_mode[0]],
-                    "send email": [send_email[0]],
-                    "email delay": [email_delay[0]],
-                    "picture delay": [picture_delay[0]],
-                    "selected data index": [selected_data_index[0]]
-                })
-                with open(settings_file, mode='w+', encoding='utf-8') as file:
-                    json.dump(settings_json, file, ensure_ascii=True, indent=4, sort_keys=False)
-            else:
-                settings_json.pop(0)
-                settings_json.append({
-                    "saved color": [saved_color[0], saved_color[1], saved_color[2]],
-                    "capture screen": [cap_screen[0]],
-                    "record video": ['False'],
-                    "smiley face": [smiley_face[0]],
-                    "dark mode": [dark_mode[0]],
-                    "send email": [send_email[0]],
-                    "email delay": [email_delay[0]],
-                    "picture delay": [picture_delay[0]],
-                    "selected data index": [selected_data_index[0]]
-                })
-                with open(settings_file, mode='w+', encoding='utf-8') as file:
-                    json.dump(settings_json, file, ensure_ascii=True, indent=4, sort_keys=False)
-        if b.text() == "Send Emails":
-            if b.isChecked() == True:
-                settings_json.pop(0)
-                settings_json.append({
-                    "saved color": [saved_color[0], saved_color[1], saved_color[2]],
-                    "capture screen": [cap_screen[0]],
-                    "record video": [record_video[0]],
-                    "smiley face": [smiley_face[0]],
-                    "dark mode": [dark_mode[0]],
-                    "send email": ['True'],
-                    "email delay": [email_delay[0]],
-                    "picture delay": [picture_delay[0]],
-                    "selected data index": [selected_data_index[0]]
-                })
-                with open(settings_file, mode='w+', encoding='utf-8') as file:
-                    json.dump(settings_json, file, ensure_ascii=True, indent=4, sort_keys=False)
-            else:
-                settings_json.pop(0)
-                settings_json.append({
-                    "saved color": [saved_color[0], saved_color[1], saved_color[2]],
-                    "capture screen": [cap_screen[0]],
-                    "record video": [record_video[0]],
-                    "smiley face": [smiley_face[0]],
-                    "dark mode": [dark_mode[0]],
-                    "send email": ['False'],
-                    "email delay": [email_delay[0]],
-                    "picture delay": [picture_delay[0]],
-                    "selected data index": [selected_data_index[0]]
-                })
-                with open(settings_file, mode='w+', encoding='utf-8') as file:
-                    json.dump(settings_json, file, ensure_ascii=True, indent=4, sort_keys=False)
-        if b.text() == "Smiley Face Addon":
-            if b.isChecked() == True:
-                settings_json.pop(0)
-                settings_json.append({
-                    "saved color": [saved_color[0], saved_color[1], saved_color[2]],
-                    "capture screen": [cap_screen[0]],
-                    "record video": [record_video[0]],
-                    "smiley face": ['True'],
-                    "dark mode": [dark_mode[0]],
-                    "send email": [send_email[0]],
-                    "email delay": [email_delay[0]],
-                    "picture delay": [picture_delay[0]],
-                    "selected data index": [selected_data_index[0]]
-                })
-                with open(settings_file, mode='w+', encoding='utf-8') as file:
-                    json.dump(settings_json, file, ensure_ascii=True, indent=4, sort_keys=False)
-            else:
-                settings_json.pop(0)
-                settings_json.append({
-                    "saved color": [saved_color[0], saved_color[1], saved_color[2]],
-                    "capture screen": [cap_screen[0]],
-                    "record video": [record_video[0]],
-                    "smiley face": ['False'],
-                    "dark mode": [dark_mode[0]],
-                    "send email": [send_email[0]],
-                    "email delay": [email_delay[0]],
-                    "picture delay": [picture_delay[0]],
-                    "selected data index": [selected_data_index[0]]
-                })
-                with open(settings_file, mode='w+', encoding='utf-8') as file:
-                    json.dump(settings_json, file, ensure_ascii=True, indent=4, sort_keys=False)
-        if b.text() == "Dark mode":
-            if b.isChecked() == True:
-                app.setStyle("Fusion")
-                palette = QPalette()
-                palette.setColor(QPalette.Window, QColor(53, 53, 53))
-                palette.setColor(QPalette.WindowText, Qt.white)
-                palette.setColor(QPalette.Base, QColor(25, 25, 25))
-                palette.setColor(QPalette.AlternateBase, QColor(53, 53, 53))
-                palette.setColor(QPalette.ToolTipBase, Qt.white)
-                palette.setColor(QPalette.ToolTipText, Qt.white)
-                palette.setColor(QPalette.Text, Qt.white)
-                palette.setColor(QPalette.Button, QColor(53, 53, 53))
-                palette.setColor(QPalette.ButtonText, Qt.white)
-                palette.setColor(QPalette.BrightText, Qt.red)
-                palette.setColor(QPalette.Link, QColor(42, 130, 218))
-                palette.setColor(QPalette.Highlight, QColor(42, 130, 218))
-                palette.setColor(QPalette.HighlightedText, Qt.black)
-                app.setPalette(palette)
-                settings_json.pop(0)
-                settings_json.append({
-                    "saved color": [saved_color[0], saved_color[1], saved_color[2]],
-                    "capture screen": [cap_screen[0]],
-                    "record video": [record_video[0]],
-                    "smiley face": [smiley_face[0]],
-                    "dark mode": ['True'],
-                    "send email": [send_email[0]],
-                    "email delay": [email_delay[0]],
-                    "picture delay": [picture_delay[0]],
-                    "selected data index": [selected_data_index[0]]
-                })
-                with open(settings_file, mode='w+', encoding='utf-8') as file:
-                    json.dump(settings_json, file, ensure_ascii=True, indent=4, sort_keys=False)
-            else:
-                app.setStyle("Fusion")
-                app.setPalette(QApplication.style().standardPalette())
-                settings_json.pop(0)
-                settings_json.append({
-                    "saved color": [saved_color[0], saved_color[1], saved_color[2]],
-                    "capture screen": [cap_screen[0]],
-                    "record video": [record_video[0]],
-                    "smiley face": [smiley_face[0]],
-                    "dark mode": ['False'],
-                    "send email": [send_email[0]],
-                    "email delay": [email_delay[0]],
-                    "picture delay": [picture_delay[0]],
-                    "selected data index": [selected_data_index[0]]
-                })
-                with open(settings_file, mode='w+', encoding='utf-8') as file:
-                    json.dump(settings_json, file, ensure_ascii=True, indent=4, sort_keys=False)
-        with open(settings_file) as file:
-            saved_color.clear()
-            send_email.clear()
-            cap_screen.clear()
-            record_video.clear()
-            smiley_face.clear()
-            dark_mode.clear()
-            email_delay.clear()
-            picture_delay.clear()
-            settings_json = json.load(file)
-            for info in settings_json:
-                for color in info['saved color']:
-                    saved_color.append(color)
-                for screen in info['capture screen']:
-                    cap_screen.append(screen)
-                for video in info['record video']:
-                    record_video.append(video)
-                for email_b in info['send email']:
-                    send_email.append(email_b)
-                for smile in info['smiley face']:
-                    smiley_face.append(smile)
-                for dark in info['dark mode']:
-                    dark_mode.append(dark)
-                for email_d in info['email delay']:
-                    email_delay.append(email_d)
-                for picture in info['picture delay']:
-                    picture_delay.append(picture)
-                for ind in info['selected data index']:
-                    selected_data_index.append(ind)
-    def startCamera(self):
-        global isActive
-        isActive = not isActive
-        if not isActive:
-            self.start.setText('Start')
-            self.start.setStyleSheet('background-color: rgb(26, 80, 9)')
-            self.start.setIcon(self.style().standardIcon(getattr(QStyle, 'SP_MediaPlay')))
-            self.setWindowIcon(self.style().standardIcon(getattr(QStyle, 'SP_DialogNoButton')))
-            # multiprocessing.Process(target=live.end_cam).start()
-            live.end_cam()
-        else:
-            self.start.setStyleSheet('background-color: rgb(80, 26, 9)')
-            self.start.setIcon(self.style().standardIcon(getattr(QStyle, 'SP_MediaStop')))
-            self.setWindowIcon(self.style().standardIcon(getattr(QStyle, 'SP_DialogYesButton')))
-            self.start.setText('Stop')
-            print('closed capture')
+        if isRunning == False:
+            cap.release()
             cv2.destroyAllWindows()
-            live.start_cam()
-            # multiprocessing.Process(target=live.start_cam).start()
-        # print(isActive)
-def getBool():
-    print(isActive)
-    return isActive
-if __name__ == '__main__':
-    if os.path.exists(settings_file):
-        with open(settings_file) as file:
-            settings_json = json.load(file)
-            for info in settings_json:
-                for color in info['saved color']:
-                    saved_color.append(color)
-                for screen in info['capture screen']:
-                    cap_screen.append(screen)
-                for video in info['record video']:
-                    record_video.append(video)
-                for email_b in info['send email']:
-                    send_email.append(email_b)
-                for smile in info['smiley face']:
-                    smiley_face.append(smile)
-                for dark in info['dark mode']:
-                    dark_mode.append(dark)
-                for email_d in info['email delay']:
-                    email_delay.append(email_d)
-                for picture in info['picture delay']:
-                    picture_delay.append(picture)
-                for ind in info['selected data index']:
-                    selected_data_index.append(ind)
-                    print(selected_data_index)
-    elif not os.path.exists(settings_file):
-        file = open(settings_file, "w+")
-        file.write("""[
-    {
-        \"saved color\":[\"0\", \"255\", \"0\"],
-        \"capture screen\": [\"False\"],
-        \"record video\": [\"False\"],
-        \"smiley face\": [\"False\"],
-        \"dark mode\": [\"True\"],
-        \"send email\": [\"True\"],
-        \"email delay\": [\"10\"],
-        \"picture delay\": [\"5\"],
-        \"selected data index\": [\"7\"]
-    }
-]""")
-        file.close()
+            print('Quit by isRunning')
+            # break
+            btnStop()
+        if cv2.waitKey(1) & 0xFF == ord('q'):
+            cap.release()
+            cv2.destroyAllWindows()
+            btnStop()
+def exit_handler():
+    print('Closing.. please wait.')
+    btnStop()
+def update_variables():
+    while isRunning:
+        global TIME, EMAIL_TIME, numOfPics, captureScreen, recording, email_pictures, SMILEY_FACE, SEND_EMAIL_DELAY, START_TIME, cascade
+        global saved_color, send_email, cap_screen, record_video, smiley_face, dark_mode, email_delay, picture_delay, saved_color, settings_json, selected_data_index, red, green, blue
+        saved_color.clear()
+        send_email.clear()
+        cap_screen.clear()
+        record_video.clear()
+        smiley_face.clear()
+        dark_mode.clear()
+        email_delay.clear()
+        picture_delay.clear()
+        selected_data_index.clear()
         with open(settings_file) as file:
             settings_json = json.load(file)
             for info in settings_json:
@@ -582,30 +282,29 @@ if __name__ == '__main__':
                     picture_delay.append(picture)
                 for ind in info['selected data index']:
                     selected_data_index.append(ind)
-    button_css = 'QPushButton {background-color: rgb(' + str(saved_color[0]) + ', ' + str(saved_color[1]) + ', ' + str(saved_color[2]) + ');}'
-
-    app = QApplication(sys.argv)
-    app.setStyle("Fusion")
-    if dark_mode[0] == 'True':
-        palette = QPalette()
-        palette.setColor(QPalette.Window, QColor(53, 53, 53))
-        palette.setColor(QPalette.WindowText, Qt.white)
-        palette.setColor(QPalette.Base, QColor(25, 25, 25))
-        palette.setColor(QPalette.AlternateBase, QColor(53, 53, 53))
-        palette.setColor(QPalette.ToolTipBase, Qt.white)
-        palette.setColor(QPalette.ToolTipText, Qt.white)
-        palette.setColor(QPalette.Text, Qt.white)
-        palette.setColor(QPalette.Button, QColor(53, 53, 53))
-        palette.setColor(QPalette.ButtonText, Qt.white)
-        palette.setColor(QPalette.BrightText, Qt.red)
-        palette.setColor(QPalette.Link, QColor(42, 130, 218))
-        palette.setColor(QPalette.Highlight, QColor(42, 130, 218))
-        palette.setColor(QPalette.HighlightedText, Qt.black)
-        app.setPalette(palette)
-    else:
-        app.setPalette(QApplication.style().standardPalette())
-    main = MainMenu()
-    main.show()
-    # START_CAMERA = multiprocessing.Process(target=MainMenu)
-    sys.exit(app.exec_())
-    # START_CAMERA.start()
+            START_TIME = int(picture_delay[0])
+            SEND_EMAIL_DELAY = int(email_delay[0])
+            SMILEY_FACE = (True if smiley_face[0] == 'True' else False)
+            captureScreen = (True if cap_screen[0] == 'True' else False)
+            recording = (True if record_video[0] == 'True' else False)
+            email_pictures = (True if send_email[0] == 'True' else False)
+            cascade = cv2.CascadeClassifier(cascade_files[int(selected_data_index[0])])
+            # print(cascade_files[int(selected_data_index[0])])
+            red, green, blue = int(saved_color[2]), int(saved_color[1]), int(saved_color[0])
+            time.sleep(1)
+def start_cam():
+    global isRunning, cap
+    cap = cv2.VideoCapture(0)
+    isRunning = True
+    print('start_cam')
+    print(f'is Running:{isRunning}')
+    atexit.register(exit_handler)
+    # START_CAMERA = threading.Thread(target=camRun).start()
+    # Process(target=camRun).start()
+    camRun()
+def end_cam():
+    global isRunning
+    isRunning = False
+    print('End_cam')
+    print(f'is Running:{isRunning}')
+    btnStop()

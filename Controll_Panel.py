@@ -105,7 +105,7 @@ class MainMenu(QWidget):
         self.ImageDelay.setValidator(QIntValidator())
         self.ImageDelay.textChanged.connect(self.lineEditChanged)
 
-        Labe3 = QLabel('Box Color:')
+        Labe3 = QLabel('Color:')
 
         self.ColorDialog = QPushButton('Color')
         self.ColorDialog.setStyleSheet(f"{button_css}")

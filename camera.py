@@ -142,7 +142,6 @@ def findFaceInImage(num):
                 minNeighbors=5,
                 minSize=(30, 30)
             )
-            print ("Found {0} faces!".format(len(faces)))
             if len(faces) >= 1:
                 # Draw a rectangle around the faces
                 for (x, y, w, h) in faces:
@@ -173,6 +172,9 @@ def findFaceInImage(num):
                 cv2.imwrite(f'Face Detection/Pics/{cropped_image_name}', crop_img)
                 print('Image Processed')
                 threading.Thread(target=email_picture, args=([image_name, cropped_image_name],)).start()
+            print ("Found {0} faces!".format(len(faces)))
+            print ("Found {0} eyes!".format(len(eyes)))
+            print ("Found {0} mouths!".format(len(mouth)))
     except Exception as e:
         print(e)
 def btnStop():

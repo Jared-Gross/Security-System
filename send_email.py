@@ -4,6 +4,7 @@ from email.mime.image import MIMEImage
 from email.mime.multipart import MIMEMultipart
 from datetime import datetime
 def email_picture(name):
+    print('Sending email..')
     #IMPORT FIELDS!!
     EMAIL = 'xxxxxxxxxxxxxx@gmail.com'
     EMAIL_TO = 'yyyyyyyyyyyy@gmail.com'
@@ -11,7 +12,7 @@ def email_picture(name):
 
     # Create the root message and fill in the from, to, and subject headers
     msgRoot = MIMEMultipart('related')
-    msgRoot['Subject'] = 'ALERT!'
+    msgRoot['Subject'] = 'Jared Room ALERT!'
     msgRoot['From'] = EMAIL
     msgRoot['To'] = EMAIL_TO
     msgRoot.preamble = 'This is a multi-part message in MIME format.'
@@ -36,3 +37,13 @@ def email_picture(name):
     smtp.login(EMAIL, EMAIL_PASSWORD)
     smtp.sendmail(EMAIL, EMAIL_TO, msgRoot.as_string())
     smtp.quit()
+    print('Email sent!')
+    image_folder = 'Face Detection/Pics'
+    for the_file in os.listdir(image_folder):
+        file_path = os.path.join(image_folder, the_file)
+        try:
+            if os.path.isfile(file_path):
+                os.unlink(file_path)
+        except Exception as e:
+            print(e)
+    print('Images deleted')

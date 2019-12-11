@@ -163,7 +163,7 @@ def findFaceInImage(num):
                             d = int(ew / 2)
                             cv2.circle(roi_color_eye, (int(ex + ew / 4) + int(d / 2), int(ey + eh / 4) + int(d / 2)), int(d) ,(blue,green,red),2)
                         for (ex,ey,ew,eh) in mouth:
-                            cv2.ellipse(roi_color_mouth, (int(ex + ew / 2), int(ey + eh / 2)), (int(ew / 3), int(ew / 12)), 0, 25, 155, (blue,green,red), 2)
+                            cv2.ellipse(roi_color_mouth, (int(ex + ew / 2), int(ey + eh / 2)), (int(ex), int(ey)), 0, 25, 155, (blue,green,red), 2)
                     else:
                         cv2.rectangle(img, (x, y), (x+w, y+h), (red, green, blue), 2)
                 img_cropped = cv2.imread(f'Face Detection/Pics/{num}.png')
@@ -230,7 +230,7 @@ def camRun():
                         cv2.circle(roi_color_eye, (int(ex + ew / 4) + int(d / 2), int(ey + eh / 4) + int(d / 2)), int(d) ,(blue,green,red),2)
                     for (ex,ey,ew,eh) in mouth:
                         # LIPS
-                        cv2.ellipse(roi_color_mouth, (int(ex + ew / 2), int(ey + eh / 2)), (int(ew / 3), int(ew / 12)), 0, 25, 155, (blue,green,red), 2)
+                        cv2.ellipse(roi_color_mouth, (int(ex + ew / 2), int(ey + eh / 2)), (int(ex), int(ey)), 0, 25, 155, (blue,green,red), 2)
                 else:
                     cv2.rectangle(frame, (x, y), (x+w, y+h), (red, green, blue), 2)
             # Display the resulting frame

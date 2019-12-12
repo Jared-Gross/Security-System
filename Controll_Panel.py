@@ -22,6 +22,7 @@ cap_screen = []
 record_video = []
 smiley_face = []
 dark_mode = []
+face_detect = []
 
 email_delay = []
 picture_delay = []
@@ -82,6 +83,10 @@ class MainMenu(QWidget):
         DarkTheme = QCheckBox('Dark mode')
         DarkTheme.setChecked(True if dark_mode[0] == 'True' else False)
         DarkTheme.toggled.connect(lambda:self.checkboxClicked(DarkTheme))
+        
+        FaceDetection = QCheckBox('Face Detect')
+        FaceDetection.setChecked(True if face_detect[0] == 'True' else False)
+        FaceDetection.toggled.connect(lambda:self.checkboxClicked(FaceDetection))
 
         vbox = QVBoxLayout()
         vbox.addWidget(captureScreen)
@@ -89,6 +94,7 @@ class MainMenu(QWidget):
         vbox.addWidget(EmailPictures)
         vbox.addWidget(SmileyFace)
         vbox.addWidget(DarkTheme)
+        vbox.addWidget(FaceDetection)
         vbox.addStretch(1)
         groupBox.setLayout(vbox)
         return groupBox
@@ -135,7 +141,7 @@ class MainMenu(QWidget):
 
         return groupBox
     def comboBoxChanged(self):
-        global saved_color, send_email, cap_screen, record_video, smiley_face, dark_mode, email_delay, picture_delay, saved_color, settings_json, button_css, selected_data_index
+        global saved_color, send_email, cap_screen, record_video, smiley_face, dark_mode, email_delay, picture_delay, saved_color, settings_json, button_css, selected_data_index, face_detect
         settings_json.pop(0)
         settings_json.append({
             "saved color": [saved_color[0], saved_color[1], saved_color[2]],
@@ -146,7 +152,8 @@ class MainMenu(QWidget):
             "send email": [send_email[0]],
             "email delay": [email_delay[0]],
             "picture delay": [picture_delay[0]],
-            "selected data index": [int(self.cascadeList.currentIndex())]
+            "selected data index": [int(self.cascadeList.currentIndex())],
+            "face detect":[face_detect[0]]
         })
         with open(settings_file, mode='w+', encoding='utf-8') as file:
             json.dump(settings_json, file, ensure_ascii=True, indent=4, sort_keys=False)
@@ -160,6 +167,7 @@ class MainMenu(QWidget):
             email_delay.clear()
             picture_delay.clear()
             selected_data_index.clear()
+            face_detect.clear()
             settings_json = json.load(file)
             for info in settings_json:
                 for color in info['saved color']:
@@ -180,8 +188,10 @@ class MainMenu(QWidget):
                     picture_delay.append(picture)
                 for ind in info['selected data index']:
                     selected_data_index.append(ind)
+                for face in info['face detect']:
+                    face_detect.append(face)
     def lineEditChanged(self):
-        global saved_color, send_email, cap_screen, record_video, smiley_face, dark_mode, email_delay, picture_delay, saved_color, settings_json, selected_data_index
+        global saved_color, send_email, cap_screen, record_video, smiley_face, dark_mode, email_delay, picture_delay, saved_color, settings_json, selected_data_index, face_detect
 
         if self.ImageDelay.text() == '':
             return
@@ -204,7 +214,8 @@ class MainMenu(QWidget):
                 "send email": [send_email[0]],
                 "email delay": [int(self.EmailDelay.text())],
                 "picture delay": [int(self.ImageDelay.text())],
-                "selected data index": [selected_data_index[0]]
+                "selected data index": [selected_data_index[0]],
+                "face detect":[face_detect[0]]
             })
             with open(settings_file, mode='w+', encoding='utf-8') as file:
                 json.dump(settings_json, file, ensure_ascii=True, indent=4, sort_keys=False)
@@ -218,6 +229,7 @@ class MainMenu(QWidget):
                 email_delay.clear()
                 picture_delay.clear()
                 selected_data_index.clear()
+                face_detect.clear()
                 settings_json = json.load(file)
                 for info in settings_json:
                     for color in info['saved color']:
@@ -238,12 +250,14 @@ class MainMenu(QWidget):
                         picture_delay.append(picture)
                     for ind in info['selected data index']:
                         selected_data_index.append(ind)
+                    for face in info['face detect']:
+                        face_detect.append(face)
     @pyqtSlot()
     def Open_Color_Dialog(self):
         # threading.Thread(target = self.openColorDialog).start()
         self.openColorDialog()
     def openColorDialog(self):
-        global saved_color, send_email, cap_screen, record_video, smiley_face, dark_mode, email_delay, picture_delay, saved_color, settings_json, button_css, selected_data_index
+        global saved_color, send_email, cap_screen, record_video, smiley_face, dark_mode, email_delay, picture_delay, saved_color, settings_json, button_css, selected_data_index, face_detect
         color = QColorDialog.getColor()
         if color.isValid():
             settings_json.pop(0)
@@ -256,7 +270,8 @@ class MainMenu(QWidget):
                 "send email": [send_email[0]],
                 "email delay": [email_delay[0]],
                 "picture delay": [picture_delay[0]],
-                "selected data index": [selected_data_index[0]]
+                "selected data index": [selected_data_index[0]],
+                "face detect":[face_detect[0]]
             })
             with open(settings_file, mode='w+', encoding='utf-8') as file:
                 json.dump(settings_json, file, ensure_ascii=True, indent=4, sort_keys=False)
@@ -270,6 +285,7 @@ class MainMenu(QWidget):
                 email_delay.clear()
                 picture_delay.clear()
                 selected_data_index.clear()
+                face_detect.clear()
                 settings_json = json.load(file)
                 for info in settings_json:
                     for color in info['saved color']:
@@ -290,11 +306,13 @@ class MainMenu(QWidget):
                         picture_delay.append(picture)
                     for ind in info['selected data index']:
                         selected_data_index.append(ind)
+                    for face in info['face detect']:
+                        face_detect.append(face)
 
         button_css = 'QPushButton {background-color: rgb(' + str(saved_color[0]) + ', ' + str(saved_color[1]) + ', ' + str(saved_color[2]) + ');}'
         self.ColorDialog.setStyleSheet(button_css)
     def checkboxClicked(self,b):
-        global saved_color, send_email, cap_screen, record_video, smiley_face, dark_mode, email_delay, picture_delay, saved_color, settings_json, selected_data_index
+        global saved_color, send_email, cap_screen, record_video, smiley_face, dark_mode, email_delay, picture_delay, saved_color, settings_json, selected_data_index, face_detect
         if b.text() == "Capture Screen":
             if b.isChecked() == True:
                 settings_json.pop(0)
@@ -307,7 +325,8 @@ class MainMenu(QWidget):
                     "send email": [send_email[0]],
                     "email delay": [email_delay[0]],
                     "picture delay": [picture_delay[0]],
-                    "selected data index": [selected_data_index[0]]
+                    "selected data index": [selected_data_index[0]],
+                    "face detect":[face_detect[0]]
                 })
                 with open(settings_file, mode='w+', encoding='utf-8') as file:
                     json.dump(settings_json, file, ensure_ascii=True, indent=4, sort_keys=False)
@@ -322,7 +341,8 @@ class MainMenu(QWidget):
                     "send email": [send_email[0]],
                     "email delay": [email_delay[0]],
                     "picture delay": [picture_delay[0]],
-                    "selected data index": [selected_data_index[0]]
+                    "selected data index": [selected_data_index[0]],
+                    "face detect":[face_detect[0]]
                 })
                 with open(settings_file, mode='w+', encoding='utf-8') as file:
                     json.dump(settings_json, file, ensure_ascii=True, indent=4, sort_keys=False)
@@ -338,7 +358,8 @@ class MainMenu(QWidget):
                     "send email": [send_email[0]],
                     "email delay": [email_delay[0]],
                     "picture delay": [picture_delay[0]],
-                    "selected data index": [selected_data_index[0]]
+                    "selected data index": [selected_data_index[0]],
+                    "face detect":[face_detect[0]]
                 })
                 with open(settings_file, mode='w+', encoding='utf-8') as file:
                     json.dump(settings_json, file, ensure_ascii=True, indent=4, sort_keys=False)
@@ -353,7 +374,8 @@ class MainMenu(QWidget):
                     "send email": [send_email[0]],
                     "email delay": [email_delay[0]],
                     "picture delay": [picture_delay[0]],
-                    "selected data index": [selected_data_index[0]]
+                    "selected data index": [selected_data_index[0]],
+                    "face detect":[face_detect[0]]
                 })
                 with open(settings_file, mode='w+', encoding='utf-8') as file:
                     json.dump(settings_json, file, ensure_ascii=True, indent=4, sort_keys=False)
@@ -369,7 +391,8 @@ class MainMenu(QWidget):
                     "send email": ['True'],
                     "email delay": [email_delay[0]],
                     "picture delay": [picture_delay[0]],
-                    "selected data index": [selected_data_index[0]]
+                    "selected data index": [selected_data_index[0]],
+                    "face detect":[face_detect[0]]
                 })
                 with open(settings_file, mode='w+', encoding='utf-8') as file:
                     json.dump(settings_json, file, ensure_ascii=True, indent=4, sort_keys=False)
@@ -384,7 +407,8 @@ class MainMenu(QWidget):
                     "send email": ['False'],
                     "email delay": [email_delay[0]],
                     "picture delay": [picture_delay[0]],
-                    "selected data index": [selected_data_index[0]]
+                    "selected data index": [selected_data_index[0]],
+                    "face detect":[face_detect[0]]
                 })
                 with open(settings_file, mode='w+', encoding='utf-8') as file:
                     json.dump(settings_json, file, ensure_ascii=True, indent=4, sort_keys=False)
@@ -400,7 +424,8 @@ class MainMenu(QWidget):
                     "send email": [send_email[0]],
                     "email delay": [email_delay[0]],
                     "picture delay": [picture_delay[0]],
-                    "selected data index": [selected_data_index[0]]
+                    "selected data index": [selected_data_index[0]],
+                    "face detect":[face_detect[0]]
                 })
                 with open(settings_file, mode='w+', encoding='utf-8') as file:
                     json.dump(settings_json, file, ensure_ascii=True, indent=4, sort_keys=False)
@@ -415,7 +440,8 @@ class MainMenu(QWidget):
                     "send email": [send_email[0]],
                     "email delay": [email_delay[0]],
                     "picture delay": [picture_delay[0]],
-                    "selected data index": [selected_data_index[0]]
+                    "selected data index": [selected_data_index[0]],
+                    "face detect":[face_detect[0]]
                 })
                 with open(settings_file, mode='w+', encoding='utf-8') as file:
                     json.dump(settings_json, file, ensure_ascii=True, indent=4, sort_keys=False)
@@ -451,7 +477,8 @@ class MainMenu(QWidget):
                     "send email": [send_email[0]],
                     "email delay": [email_delay[0]],
                     "picture delay": [picture_delay[0]],
-                    "selected data index": [selected_data_index[0]]
+                    "selected data index": [selected_data_index[0]],
+                    "face detect":[face_detect[0]]
                 })
                 with open(settings_file, mode='w+', encoding='utf-8') as file:
                     json.dump(settings_json, file, ensure_ascii=True, indent=4, sort_keys=False)
@@ -474,7 +501,41 @@ class MainMenu(QWidget):
                     "send email": [send_email[0]],
                     "email delay": [email_delay[0]],
                     "picture delay": [picture_delay[0]],
-                    "selected data index": [selected_data_index[0]]
+                    "selected data index": [selected_data_index[0]],
+                    "face detect":[face_detect[0]]
+                })
+                with open(settings_file, mode='w+', encoding='utf-8') as file:
+                    json.dump(settings_json, file, ensure_ascii=True, indent=4, sort_keys=False)
+        if b.text() == "Face Detect":
+            if b.isChecked() == True:
+                settings_json.pop(0)
+                settings_json.append({
+                    "saved color": [saved_color[0], saved_color[1], saved_color[2]],
+                    "capture screen": [cap_screen[0]],
+                    "record video": [record_video[0]],
+                    "smiley face": [smiley_face[0]],
+                    "dark mode": [dark_mode[0]],
+                    "send email": [send_email[0]],
+                    "email delay": [email_delay[0]],
+                    "picture delay": [picture_delay[0]],
+                    "selected data index": [selected_data_index[0]],
+                    "face detect":['True']
+                })
+                with open(settings_file, mode='w+', encoding='utf-8') as file:
+                    json.dump(settings_json, file, ensure_ascii=True, indent=4, sort_keys=False)
+            else:
+                settings_json.pop(0)
+                settings_json.append({
+                    "saved color": [saved_color[0], saved_color[1], saved_color[2]],
+                    "capture screen": [cap_screen[0]],
+                    "record video": [record_video[0]],
+                    "smiley face": [smiley_face[0]],
+                    "dark mode": [dark_mode[0]],
+                    "send email": [send_email[0]],
+                    "email delay": [email_delay[0]],
+                    "picture delay": [picture_delay[0]],
+                    "selected data index": [selected_data_index[0]],
+                    "face detect":['False']
                 })
                 with open(settings_file, mode='w+', encoding='utf-8') as file:
                     json.dump(settings_json, file, ensure_ascii=True, indent=4, sort_keys=False)
@@ -487,6 +548,7 @@ class MainMenu(QWidget):
             dark_mode.clear()
             email_delay.clear()
             picture_delay.clear()
+            face_detect.clear()
             settings_json = json.load(file)
             for info in settings_json:
                 for color in info['saved color']:
@@ -507,6 +569,8 @@ class MainMenu(QWidget):
                     picture_delay.append(picture)
                 for ind in info['selected data index']:
                     selected_data_index.append(ind)
+                for face in info['face detect']:
+                    face_detect.append(face)
     def startCamera(self):
         global isActive
         isActive = not isActive
@@ -551,7 +615,8 @@ if __name__ == '__main__':
                     picture_delay.append(picture)
                 for ind in info['selected data index']:
                     selected_data_index.append(ind)
-                    print(selected_data_index)
+                for face in info['face detect']:
+                    face_detect.append(face)
     elif not os.path.exists(settings_file):
         file = open(settings_file, "w+")
         file.write("""[
@@ -564,7 +629,8 @@ if __name__ == '__main__':
         \"send email\": [\"True\"],
         \"email delay\": [\"10\"],
         \"picture delay\": [\"5\"],
-        \"selected data index\": [\"7\"]
+        \"selected data index\": [\"7\"],
+        \"face detect\": [\"True\"]
     }
 ]""")
         file.close()
@@ -589,6 +655,8 @@ if __name__ == '__main__':
                     picture_delay.append(picture)
                 for ind in info['selected data index']:
                     selected_data_index.append(ind)
+                for face in info['face detect']:
+                    face_detect.append(face)
     button_css = 'QPushButton {background-color: rgb(' + str(saved_color[0]) + ', ' + str(saved_color[1]) + ', ' + str(saved_color[2]) + ');}'
     
     app = QApplication(sys.argv)

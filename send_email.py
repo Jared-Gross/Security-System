@@ -8,12 +8,13 @@ def email_picture(name):
     #IMPORT FIELDS!!
     EMAIL = 'xxxxxxxxxxxxxx@gmail.com'
     EMAIL_TO = 'yyyyyyyyyyyy@gmail.com'
-    EMAIL_PASSWORD = 'YOUR_EMAIL_PASSWORD'
-    '''
-    DO NOT USE YOUR ACTUAL GMAIL PASSWORD!!
-    https://myaccount.google.com/security
-    go here sign into your google account
-    go to app passwords
+    EMAIL_PASSWORD = PASSWORD #<---------
+    '''                                   \
+                                           \
+    DO NOT USE YOUR ACTUAL GMAIL PASSWORD!! \
+    go here sign into your google account    \
+    https://myaccount.google.com/security     \
+        go to app passwords                    |
     create a password and put that password there.
     '''
     

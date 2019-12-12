@@ -9,7 +9,14 @@ def email_picture(name):
     EMAIL = 'xxxxxxxxxxxxxx@gmail.com'
     EMAIL_TO = 'yyyyyyyyyyyy@gmail.com'
     EMAIL_PASSWORD = 'YOUR_EMAIL_PASSWORD'
-
+    '''
+    DO NOT USE YOUR ACTUAL GMAIL PASSWORD!!
+    https://myaccount.google.com/security
+    go here sign into your google account
+    go to app passwords
+    create a password and put that password there.
+    '''
+    
     # Create the root message and fill in the from, to, and subject headers
     msgRoot = MIMEMultipart('related')
     msgRoot['Subject'] = 'Jared Room ALERT!'

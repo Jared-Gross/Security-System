@@ -16,6 +16,7 @@ def email_picture(name):
     https://myaccount.google.com/security     \
         go to app passwords                    |
     create a password and put that password there.
+    Also showcased here: https://www.interviewqs.com/blog/py_email
     '''
     
     # Create the root message and fill in the from, to, and subject headers

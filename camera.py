@@ -175,20 +175,13 @@ def findFaceInImage(num):
                 cv2.imwrite(f'Face Detection/Pics/{image_name}', img)
                 cv2.imwrite(f'Face Detection/Pics/{cropped_image_name}', crop_img)
                 print('Image Processed')
-                if faceDetection and SMILEY_FACE:
-                    threading.Thread(target=email_picture, args=([image_name, cropped_image_name],f'Found {len(faces)} face/s!\nFound {len(eyes)} eye/s!\nFound {len(mouth)} mouth/s!\n',)).start()
-                elif faceDetection and not SMILEY_FACE:
-                    threading.Thread(target=email_picture, args=([image_name, cropped_image_name],f'Found {len(faces)} face/s!',)).start()
-                elif not faceDetection and not SMILEY_FACE:
-                    threading.Thread(target=email_picture, args=([image_name, cropped_image_name],f'Motion detected!\nFound {len(faces)} face/s',)).start()
-                elif not faceDetection and SMILEY_FACE:
-                    threading.Thread(target=email_picture, args=([image_name, cropped_image_name],f'Motion detected!\nFound {len(faces)} face/s!\nFound {len(eyes)} eye/s!\nFound {len(mouth)} mouth/s!',)).start()
+                if faceDetection and SMILEY_FACE:           threading.Thread(target=email_picture, args=([image_name, cropped_image_name],f'Found {len(faces)} face/s!\n Found {len(eyes)} eye/s!\n Found {len(mouth)} mouth/s!',)).start()
+                elif faceDetection and not SMILEY_FACE:     threading.Thread(target=email_picture, args=([image_name, cropped_image_name],f'Found {len(faces)} face/s!',)).start()
+                elif not faceDetection and not SMILEY_FACE: threading.Thread(target=email_picture, args=([image_name, cropped_image_name],f'Motion detected!\n Found {len(faces)} face/s',)).start()
+                elif not faceDetection and SMILEY_FACE:     threading.Thread(target=email_picture, args=([image_name, cropped_image_name],f'Motion detected!\n Found {len(faces)} face/s!\n Found {len(eyes)} eye/s!\n Found {len(mouth)} mouth/s!',)).start()
             elif not faceDetection:
-                # img_cropped = cv2.imread(f'Face Detection/Pics/{num}.png')
-                # crop_img = img_cropped[y:y+h, x:x+w]
                 cv2.putText(img, datetime.now().strftime("%A %d %B %Y %I:%M:%S%p"), (10, img.shape[0] - 10), cv2.FONT_HERSHEY_SIMPLEX, 0.35, (red, green, blue), 1)
                 cv2.imwrite(f'Face Detection/Pics/{image_name}', img)
-                # cv2.imwrite(f'Face Detection/Pics/{cropped_image_name}', crop_img)
                 print('Image Processed')
                 threading.Thread(target=email_picture, args=([image_name, cropped_image_name],f'Motion detected!',)).start()
             print ("Found {0} faces!".format(len(faces)))
@@ -392,8 +385,10 @@ def start_cam():
     global isRunning
     isRunning = True
     atexit.register(exit_handler)
-    camRun()
+    threading.Thread(target=camRun).start()
+    # camRun()
 def end_cam():
     global isRunning
     isRunning = False
-    btnStop()
+    threading.Thread(target=btnStop).start()
+    # btnStop()

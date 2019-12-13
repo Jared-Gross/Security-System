@@ -40,8 +40,9 @@ class MainMenu(QWidget):
         grid.addWidget(self.CheckGroup(), 0, 1)
         grid.addWidget(self.Controll(), 1, 1)
         self.setLayout(grid)
+        self.setMinimumSize(400, 260)        
+        self.ColorDialog.setStyleSheet(button_css)
 
-        self.setMinimumSize(400, 260)
     def ComboBox(self):
         global selected_data_index
         groupBox = QGroupBox("Recognition type")
@@ -53,7 +54,9 @@ class MainMenu(QWidget):
             j = j.replace('_', ' ')
             self.cascadeList.addItem(j)
         self.cascadeList.setCurrentIndex(int(selected_data_index[0]))
+        self.cascadeList.setToolTip('A list of diffrent recognition types.')
         self.cascadeList.currentTextChanged.connect(self.comboBoxChanged)
+        # self.cascadeList.setStyleSheet('color: white')
         vbox = QVBoxLayout()
         vbox.addWidget(self.cascadeList)
         vbox.addStretch(1)
@@ -70,37 +73,45 @@ class MainMenu(QWidget):
         captureScreen.setChecked(True if cap_screen[0] == 'True' else False)
         captureScreen.setStyleSheet('background-color: hsl(126, 81%, 29%)') if cap_screen[0] == 'True' else captureScreen.setStyleSheet('background-color: rgb(106, 11, 11)')
         captureScreen.toggled.connect(lambda:self.checkboxClicked(captureScreen))
-
+        captureScreen.setToolTip('Record your entire screen (*Very performance heavy)')
+        
         RecordVideo = QPushButton('Record Video')
         RecordVideo.setCheckable(True)
         RecordVideo.setChecked(True if record_video[0] == 'True' else False)
         RecordVideo.setStyleSheet('background-color: hsl(126, 81%, 29%)') if record_video[0] == 'True' else RecordVideo.setStyleSheet('background-color: rgb(106, 11, 11)')
         RecordVideo.toggled.connect(lambda:self.checkboxClicked(RecordVideo))
+        RecordVideo.setToolTip('Record the webcam.')
 
         EmailPictures = QPushButton('Send Emails')
         EmailPictures.setCheckable(True)
         EmailPictures.setChecked(True if send_email[0] == 'True' else False)
         EmailPictures.setStyleSheet('background-color: hsl(126, 81%, 29%)') if send_email[0] == 'True' else EmailPictures.setStyleSheet('background-color: rgb(106, 11, 11)')
         EmailPictures.toggled.connect(lambda:self.checkboxClicked(EmailPictures))
+        EmailPictures.setToolTip('Sends you an email for the movement it just detected.')
 
         SmileyFace = QPushButton('Smiley Face Addon')
         SmileyFace.setCheckable(True)
         SmileyFace.setChecked(True if smiley_face[0] == 'True' else False)
         SmileyFace.setStyleSheet('background-color: hsl(126, 81%, 29%)') if smiley_face[0] == 'True' else SmileyFace.setStyleSheet('background-color: rgb(106, 11, 11)')
         SmileyFace.toggled.connect(lambda:self.checkboxClicked(SmileyFace))
-
+        SmileyFace.setToolTip('Will draw a smiley face where your face is.')
+        
         DarkTheme = QPushButton('Dark mode')
         DarkTheme.setCheckable(True)
         DarkTheme.setChecked(True if dark_mode[0] == 'True' else False)
+        DarkTheme.setText('Dark mode' if dark_mode[0] == 'True' else 'Light mode')
         DarkTheme.setStyleSheet('background-color: hsl(126, 81%, 29%)') if dark_mode[0] == 'True' else DarkTheme.setStyleSheet('background-color: rgb(106, 11, 11)')
         DarkTheme.toggled.connect(lambda:self.checkboxClicked(DarkTheme))
-
+        DarkTheme.setToolTip('Enabled Dark/Light theme for window.')
+        
         self.FaceDetection = QPushButton('Face Detection')
         self.FaceDetection.setCheckable(True)
+        self.FaceDetection.setText('Face Detection' if face_detect[0] == 'True' else 'Motion Detection')
         self.FaceDetection.setChecked(True if face_detect[0] == 'True' else False)
         self.FaceDetection.setStyleSheet('background-color: hsl(126, 81%, 29%)') if face_detect[0] == 'True' else self.FaceDetection.setStyleSheet('background-color: rgb(106, 11, 11)')
         self.FaceDetection.toggled.connect(lambda:self.checkboxClicked(self.FaceDetection))
-
+        self.FaceDetection.setToolTip('You can either use face detection or motion detection.')
+        
         vbox = QVBoxLayout()
         vbox.addWidget(captureScreen)
         vbox.addWidget(RecordVideo)
@@ -119,17 +130,20 @@ class MainMenu(QWidget):
         self.EmailDelay = QLineEdit(str(email_delay[0]))
         self.EmailDelay.setValidator(QIntValidator())
         self.EmailDelay.textChanged.connect(self.lineEditChanged)
-        Labe2 = QLabel('Snap Picture Delay:')
+        self.EmailDelay.setToolTip(f'Program will wait {self.EmailDelay.text()} before sending another email')
+        
+        Labe2 = QLabel('Take Picture Delay:')
         self.ImageDelay = QLineEdit(str(picture_delay[0]))
         self.ImageDelay.setValidator(QIntValidator())
         self.ImageDelay.textChanged.connect(self.lineEditChanged)
+        self.ImageDelay.setToolTip(f'Program will wait {self.ImageDelay.text()} before taking another picture (*Record video)')
 
         Labe3 = QLabel('Color:')
 
-        self.ColorDialog = QPushButton('Color')
-        self.ColorDialog.setStyleSheet(f"{button_css}")
+        self.ColorDialog = QPushButton('Box Color')
         self.ColorDialog.clicked.connect(self.Open_Color_Dialog)
-
+        self.ColorDialog.setToolTip('Change the color of lines in face detection.')
+        self.ColorDialog.setStyleSheet(button_css)
         vbox = QVBoxLayout()
         vbox.addWidget(Label1)
         vbox.addWidget(self.EmailDelay)
@@ -145,6 +159,7 @@ class MainMenu(QWidget):
         groupBox = QGroupBox("Control")
         self.start = QPushButton('Start', self)
         self.start.setStyleSheet('background-color: hsl(126, 81%, 29%)')
+        self.start.setToolTip('Start/Stop the webcam')
         self.start.setIcon(self.style().standardIcon(getattr(QStyle, 'SP_MediaPlay')))
         self.start.clicked.connect(self.startCamera)
         vbox = QVBoxLayout()
@@ -206,6 +221,9 @@ class MainMenu(QWidget):
     def lineEditChanged(self):
         global saved_color, send_email, cap_screen, record_video, smiley_face, dark_mode, email_delay, picture_delay, saved_color, settings_json, selected_data_index, face_detect
 
+        self.EmailDelay.setToolTip(f'Program will wait {self.EmailDelay.text()} before sending another email')
+        self.ImageDelay.setToolTip(f'Program will wait {self.ImageDelay.text()} before taking another picture (*Record video)')
+        
         if self.ImageDelay.text() == '':
             return
         if self.EmailDelay.text() == '':
@@ -267,9 +285,6 @@ class MainMenu(QWidget):
                         face_detect.append(face)
     @pyqtSlot()
     def Open_Color_Dialog(self):
-        # threading.Thread(target = self.openColorDialog).start()
-        self.openColorDialog()
-    def openColorDialog(self):
         global saved_color, send_email, cap_screen, record_video, smiley_face, dark_mode, email_delay, picture_delay, saved_color, settings_json, button_css, selected_data_index, face_detect
         color = QColorDialog.getColor()
         if color.isValid():
@@ -322,12 +337,11 @@ class MainMenu(QWidget):
                     for face in info['face detect']:
                         face_detect.append(face)
 
-        button_css = 'QPushButton {background-color: rgb(' + str(saved_color[0]) + ', ' + str(saved_color[1]) + ', ' + str(saved_color[2]) + ');}'
+        button_css = 'background-color: rgb(' + str(saved_color[0]) + ', ' + str(saved_color[1]) + ', ' + str(saved_color[2]) + ');'
         self.ColorDialog.setStyleSheet(button_css)
     def checkboxClicked(self,b):
         global saved_color, send_email, cap_screen, record_video, smiley_face, dark_mode, email_delay, picture_delay, saved_color, settings_json, selected_data_index, face_detect
-        
-        b.setStyleSheet('background-color: hsl(126, 81%, 29%); color: white') if b.isChecked() == True else b.setStyleSheet('background-color: rgb(106, 11, 11); color: white')
+        b.setStyleSheet('background-color: hsl(126, 81%, 29%)') if b.isChecked() == True else b.setStyleSheet('background-color: rgb(106, 11, 11)')
         if b.text() == "Capture Screen":
             if b.isChecked() == True:
                 settings_json.pop(0)
@@ -466,15 +480,15 @@ class MainMenu(QWidget):
                 })
                 with open(settings_file, mode='w+', encoding='utf-8') as file:
                     json.dump(settings_json, file, ensure_ascii=True, indent=4, sort_keys=False)
-        if b.text() == "Dark mode":
+        if b.text() == "Dark mode" or b.text() == 'Light mode':
             if b.isChecked() == True:
+                b.setText('Dark mode')
                 app.setStyle("Fusion")
                 palette = QPalette()
                 gradient = QLinearGradient(0, 0, 0, 400)
                 gradient.setColorAt(0.0, QColor(40, 40, 40))
                 gradient.setColorAt(1.0, QColor(30, 30, 30))
                 palette.setBrush(QPalette.Window, QBrush(gradient))
-                # palette.setColor(QPalette.Window, QColor(53, 53, 53))
                 palette.setColor(QPalette.WindowText, Qt.white)
                 palette.setColor(QPalette.Base, QColor(25, 25, 25))
                 palette.setColor(QPalette.AlternateBase, QColor(53, 53, 53))
@@ -504,12 +518,14 @@ class MainMenu(QWidget):
                 with open(settings_file, mode='w+', encoding='utf-8') as file:
                     json.dump(settings_json, file, ensure_ascii=True, indent=4, sort_keys=False)
             else:
+                b.setText('Light mode')
                 app.setStyle("Fusion")
                 app.setPalette(QApplication.style().standardPalette())
                 palette = QPalette()
                 gradient = QLinearGradient(0, 0, 0, 400)
                 gradient.setColorAt(0.0, QColor(240, 240, 240))
                 gradient.setColorAt(1.0, QColor(215, 215, 215))
+                palette.setColor(QPalette.ButtonText, Qt.black)
                 palette.setBrush(QPalette.Window, QBrush(gradient))
                 app.setPalette(palette)
                 settings_json.pop(0)
@@ -527,8 +543,9 @@ class MainMenu(QWidget):
                 })
                 with open(settings_file, mode='w+', encoding='utf-8') as file:
                     json.dump(settings_json, file, ensure_ascii=True, indent=4, sort_keys=False)
-        if b.text() == "Face Detection":
+        if b.text() == "Face Detection" or b.text() == 'Motion Detection':
             if b.isChecked() == True:
+                b.setText('Face Detection')
                 settings_json.pop(0)
                 settings_json.append({
                     "saved color": [saved_color[0], saved_color[1], saved_color[2]],
@@ -545,6 +562,7 @@ class MainMenu(QWidget):
                 with open(settings_file, mode='w+', encoding='utf-8') as file:
                     json.dump(settings_json, file, ensure_ascii=True, indent=4, sort_keys=False)
             else:
+                b.setText('Motion Detection')
                 settings_json.pop(0)
                 settings_json.append({
                     "saved color": [saved_color[0], saved_color[1], saved_color[2]],
@@ -640,7 +658,8 @@ if __name__ == '__main__':
                     face_detect.append(face)
     elif not os.path.exists(settings_file):
         file = open(settings_file, "w+")
-        file.write("""[
+        file.write(
+"""[
     {
         \"saved color\":[\"0\", \"255\", \"0\"],
         \"capture screen\": [\"False\"],
@@ -653,7 +672,8 @@ if __name__ == '__main__':
         \"selected data index\": [\"7\"],
         \"face detect\": [\"True\"]
     }
-]""")
+]"""
+)
         file.close()
         with open(settings_file) as file:
             settings_json = json.load(file)
@@ -678,7 +698,7 @@ if __name__ == '__main__':
                     selected_data_index.append(ind)
                 for face in info['face detect']:
                     face_detect.append(face)
-    button_css = 'QPushButton {background-color: rgb(' + str(saved_color[0]) + ', ' + str(saved_color[1]) + ', ' + str(saved_color[2]) + ');}'
+    button_css = 'background-color: rgb(' + str(saved_color[0]) + ', ' + str(saved_color[1]) + ', ' + str(saved_color[2]) + ')'
 
     app = QApplication(sys.argv)
     app.setStyle("Fusion")
@@ -707,6 +727,7 @@ if __name__ == '__main__':
         gradient = QLinearGradient(0, 0, 0, 400)
         gradient.setColorAt(0.0, QColor(240, 240, 240))
         gradient.setColorAt(1.0, QColor(215, 215, 215))
+        palette.setColor(QPalette.ButtonText, Qt.black)
         palette.setBrush(QPalette.Window, QBrush(gradient))
         app.setPalette(palette)
     main = MainMenu()

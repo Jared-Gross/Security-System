@@ -83,7 +83,7 @@ class MainMenu(QWidget):
         DarkTheme = QCheckBox('Dark mode')
         DarkTheme.setChecked(True if dark_mode[0] == 'True' else False)
         DarkTheme.toggled.connect(lambda:self.checkboxClicked(DarkTheme))
-        
+
         FaceDetection = QCheckBox('Face Detect')
         FaceDetection.setChecked(True if face_detect[0] == 'True' else False)
         FaceDetection.toggled.connect(lambda:self.checkboxClicked(FaceDetection))
@@ -658,7 +658,7 @@ if __name__ == '__main__':
                 for face in info['face detect']:
                     face_detect.append(face)
     button_css = 'QPushButton {background-color: rgb(' + str(saved_color[0]) + ', ' + str(saved_color[1]) + ', ' + str(saved_color[2]) + ');}'
-    
+
     app = QApplication(sys.argv)
     app.setStyle("Fusion")
     if dark_mode[0] == 'True':

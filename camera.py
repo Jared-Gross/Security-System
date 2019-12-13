@@ -9,7 +9,6 @@ import natsort as nt
 from datetime import datetime
 from send_email import email_picture
 from threading import Timer
-import Controll_Panel
 # captureScreen = IntVar()
 captureScreen = False
 recording = False
@@ -157,12 +156,12 @@ def findFaceInImage(num):
                         roi_gray_mouth = gray[y+(int(h/2)):y+h, x:x+w]
                         roi_color_mouth = img[y+(int(h/2)):y+h, x:x+w]
                         mouth = mouth_cascade.detectMultiScale(roi_gray_mouth)
-                        
+
                         # EYES
                         roi_gray_eye = gray[y-(int(h/2)):y+h, x:x+w]
                         roi_color_eye = img[y-(int(h/2)):y+h, x:x+w]
                         eyes = eye_cascade.detectMultiScale(roi_gray_eye)
-                        
+
                         for (ex,ey,ew,eh) in eyes:
                             d = int(ew / 2)
                             cv2.circle(roi_color_eye, (int(ex + ew / 4) + int(d / 2), int(ey + eh / 4) + int(d / 2)), int(d) ,(blue,green,red),2)
@@ -214,6 +213,7 @@ def btnStop():
 def camRun():
     global TIME, EMAIL_TIME, numOfPics, captureScreen, recording, email_pictures, SMILEY_FACE, SEND_EMAIL_DELAY, START_TIME, cascade, faceDetection
     global saved_color, send_email, cap_screen, record_video, smiley_face, dark_mode, email_delay, picture_delay, saved_color, settings_json, selected_data_index, red, green, blue, face_detect
+    cap = cv2.VideoCapture(0)
     print("Starting..")
     threading.Thread(target = update_variables).start()
     eye_cascade = cv2.CascadeClassifier(cascade_files[0])
@@ -225,11 +225,11 @@ def camRun():
     args = vars(ap.parse_args())
     firstFrame = None
     while isRunning:
+        ret, frame = cap.read()
         if faceDetection:
             # Capture frame-by-frame
-            ret, frame = cap.read()
+            text = "No face/s detected"
             if ret:
-                text = "No face/s detected"
                 # Our operations on the frame come here
                 gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
                 # Detect faces in the image
@@ -277,25 +277,23 @@ def camRun():
                     savePicture(numOfPics)
                     PROCESS_IMAGE = threading.Thread(target=findFaceInImage, args=(numOfPics,))
                     PROCESS_IMAGE.start()
+                cv2.putText(frame, datetime.now().strftime("%A %d %B %Y %I:%M:%S%p"), (10, frame.shape[0] - 10), cv2.FONT_HERSHEY_SIMPLEX, 0.35, (red, green, blue), 1)
             if SMILEY_FACE:
                 cv2.putText(frame, f"Found {len(faces)} face/s!  Found {len(eyes)} eye/s!  Found {len(mouth)} mouth/s!", (10, 20), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (red, green, blue), 2)
             else:
                 cv2.putText(frame, "{}".format(text), (10, 20), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (red, green, blue), 2)
-
-            cv2.putText(frame, datetime.now().strftime("%A %d %B %Y %I:%M:%S%p"), (10, frame.shape[0] - 10), cv2.FONT_HERSHEY_SIMPLEX, 0.35, (red, green, blue), 1)
         else:
-            ret, frame = cap.read()
             text = "No Movement"
             if frame is None:
                 break
             gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
-            gray = cv2.GaussianBlur(gray, (21, 21), 0)
+            gray = cv2.GaussianBlur(gray, (7, 7), 0)
             if firstFrame is None:
                 firstFrame = gray
                 continue
             frameDelta = cv2.absdiff(firstFrame, gray)
-            thresh = cv2.threshold(frameDelta, 8, 255, cv2.THRESH_BINARY)[1]
-            thresh = cv2.dilate(thresh, None, iterations=2)
+            thresh = cv2.threshold(frameDelta, 7, 255, cv2.THRESH_BINARY)[1]
+            thresh = cv2.dilate(thresh, None, iterations=4)
             cnts = cv2.findContours(thresh.copy(), cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
             cnts = imutils.grab_contours(cnts)
             for c in cnts:
@@ -322,15 +320,15 @@ def camRun():
             cv2.putText(frame, "Room Status: {}".format(text), (10, 20), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (red, green, blue), 2)
             cv2.putText(frame, datetime.now().strftime("%A %d %B %Y %I:%M:%S%p"), (10, frame.shape[0] - 10), cv2.FONT_HERSHEY_SIMPLEX, 0.35, (red, green, blue), 1)
             # show the frame and record if the user presses a key
-            # cv2.imshow("Security Feed", frame)
             # cv2.imshow("Thresh", thresh)
             # cv2.imshow("Frame Delta", frameDelta)
             key = cv2.waitKey(1) & 0xFF
             if key == ord("q"):
                 break
             firstFrame = gray
-            time.sleep(0.06)
-        cv2.imshow('Camera', frame)
+            time.sleep(0.03)
+        if ret:
+            cv2.imshow('Camera', frame)
         if isRunning == False:
             cap.release()
             cv2.destroyAllWindows()
@@ -391,18 +389,11 @@ def update_variables():
             red, green, blue = int(saved_color[2]), int(saved_color[1]), int(saved_color[0])
             time.sleep(1)
 def start_cam():
-    global isRunning, cap
-    cap = cv2.VideoCapture(0)
+    global isRunning
     isRunning = True
-    print('start_cam')
-    print(f'is Running:{isRunning}')
     atexit.register(exit_handler)
-    # START_CAMERA = threading.Thread(target=camRun).start()
-    # Process(target=camRun).start()
     camRun()
 def end_cam():
     global isRunning
     isRunning = False
-    print('End_cam')
-    print(f'is Running:{isRunning}')
     btnStop()

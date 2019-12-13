@@ -64,29 +64,42 @@ class MainMenu(QWidget):
         global saved_color, send_email, cap_screen, record_video, smiley_face, dark_mode
         groupBox = QGroupBox("Configuration")
 
-        captureScreen = QCheckBox('Capture Screen')
+        # captureScreen = QCheckBox('Capture Screen')
+        captureScreen = QPushButton('Capture Screen')
+        captureScreen.setCheckable(True)
         captureScreen.setChecked(True if cap_screen[0] == 'True' else False)
+        captureScreen.setStyleSheet('background-color: hsl(126, 81%, 29%)') if cap_screen[0] == 'True' else captureScreen.setStyleSheet('background-color: rgb(106, 11, 11)')
         captureScreen.toggled.connect(lambda:self.checkboxClicked(captureScreen))
 
-        RecordVideo = QCheckBox('Record Video')
+        RecordVideo = QPushButton('Record Video')
+        RecordVideo.setCheckable(True)
         RecordVideo.setChecked(True if record_video[0] == 'True' else False)
+        RecordVideo.setStyleSheet('background-color: hsl(126, 81%, 29%)') if record_video[0] == 'True' else RecordVideo.setStyleSheet('background-color: rgb(106, 11, 11)')
         RecordVideo.toggled.connect(lambda:self.checkboxClicked(RecordVideo))
 
-        EmailPictures = QCheckBox('Send Emails')
+        EmailPictures = QPushButton('Send Emails')
+        EmailPictures.setCheckable(True)
         EmailPictures.setChecked(True if send_email[0] == 'True' else False)
+        EmailPictures.setStyleSheet('background-color: hsl(126, 81%, 29%)') if send_email[0] == 'True' else EmailPictures.setStyleSheet('background-color: rgb(106, 11, 11)')
         EmailPictures.toggled.connect(lambda:self.checkboxClicked(EmailPictures))
 
-        SmileyFace = QCheckBox('Smiley Face Addon')
+        SmileyFace = QPushButton('Smiley Face Addon')
+        SmileyFace.setCheckable(True)
         SmileyFace.setChecked(True if smiley_face[0] == 'True' else False)
+        SmileyFace.setStyleSheet('background-color: hsl(126, 81%, 29%)') if smiley_face[0] == 'True' else SmileyFace.setStyleSheet('background-color: rgb(106, 11, 11)')
         SmileyFace.toggled.connect(lambda:self.checkboxClicked(SmileyFace))
 
-        DarkTheme = QCheckBox('Dark mode')
+        DarkTheme = QPushButton('Dark mode')
+        DarkTheme.setCheckable(True)
         DarkTheme.setChecked(True if dark_mode[0] == 'True' else False)
+        DarkTheme.setStyleSheet('background-color: hsl(126, 81%, 29%)') if dark_mode[0] == 'True' else DarkTheme.setStyleSheet('background-color: rgb(106, 11, 11)')
         DarkTheme.toggled.connect(lambda:self.checkboxClicked(DarkTheme))
 
-        FaceDetection = QCheckBox('Face Detect')
-        FaceDetection.setChecked(True if face_detect[0] == 'True' else False)
-        FaceDetection.toggled.connect(lambda:self.checkboxClicked(FaceDetection))
+        self.FaceDetection = QPushButton('Face Detection')
+        self.FaceDetection.setCheckable(True)
+        self.FaceDetection.setChecked(True if face_detect[0] == 'True' else False)
+        self.FaceDetection.setStyleSheet('background-color: hsl(126, 81%, 29%)') if face_detect[0] == 'True' else self.FaceDetection.setStyleSheet('background-color: rgb(106, 11, 11)')
+        self.FaceDetection.toggled.connect(lambda:self.checkboxClicked(self.FaceDetection))
 
         vbox = QVBoxLayout()
         vbox.addWidget(captureScreen)
@@ -94,7 +107,7 @@ class MainMenu(QWidget):
         vbox.addWidget(EmailPictures)
         vbox.addWidget(SmileyFace)
         vbox.addWidget(DarkTheme)
-        vbox.addWidget(FaceDetection)
+        vbox.addWidget(self.FaceDetection)
         vbox.addStretch(1)
         groupBox.setLayout(vbox)
         return groupBox
@@ -313,6 +326,8 @@ class MainMenu(QWidget):
         self.ColorDialog.setStyleSheet(button_css)
     def checkboxClicked(self,b):
         global saved_color, send_email, cap_screen, record_video, smiley_face, dark_mode, email_delay, picture_delay, saved_color, settings_json, selected_data_index, face_detect
+        
+        b.setStyleSheet('background-color: hsl(126, 81%, 29%); color: white') if b.isChecked() == True else b.setStyleSheet('background-color: rgb(106, 11, 11); color: white')
         if b.text() == "Capture Screen":
             if b.isChecked() == True:
                 settings_json.pop(0)
@@ -414,6 +429,12 @@ class MainMenu(QWidget):
                     json.dump(settings_json, file, ensure_ascii=True, indent=4, sort_keys=False)
         if b.text() == "Smiley Face Addon":
             if b.isChecked() == True:
+                if face_detect[0] == 'False' or not self.cascadeList.currentIndex() == 7 and not self.cascadeList.currentIndex() == 6 and not self.cascadeList.currentIndex() == 5 and not self.cascadeList.currentIndex() == 4:
+                    buttonReply = QMessageBox.question(self, "Enable 'face detection'", "You currently do not have 'face detection' enabled, if you want to get the best result, I would suggest you enable it.\nDo you want to enable 'face detection'?", QMessageBox.Yes | QMessageBox.No, QMessageBox.Yes)
+                    if buttonReply == QMessageBox.Yes:
+                        self.cascadeList.setCurrentIndex(7)
+                        self.FaceDetection.setChecked(True)
+                        self.checkboxClicked(self.FaceDetection)
                 settings_json.pop(0)
                 settings_json.append({
                     "saved color": [saved_color[0], saved_color[1], saved_color[2]],
@@ -506,7 +527,7 @@ class MainMenu(QWidget):
                 })
                 with open(settings_file, mode='w+', encoding='utf-8') as file:
                     json.dump(settings_json, file, ensure_ascii=True, indent=4, sort_keys=False)
-        if b.text() == "Face Detect":
+        if b.text() == "Face Detection":
             if b.isChecked() == True:
                 settings_json.pop(0)
                 settings_json.append({

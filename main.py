@@ -4,7 +4,7 @@ from PyQt5.QtWidgets import *
 from PyQt5.QtCore import *
 from PyQt5.QtGui import *
 from PyQt5 import *
-import sys, os, shutil, json, multiprocessing, cv2, threading
+import sys, os, shutil, json, multiprocessing, cv2
 from functools import partial
 from os import listdir
 from os.path import isfile, join
@@ -36,7 +36,7 @@ class MainMenu(QMainWindow):
     def __init__(self, parent = None):
         super(MainMenu, self).__init__(parent)
         self.menu()
-        self.setMinimumSize(400, 320)
+        self.setMinimumSize(400, 300)
         lay = QWidget(self)
         lay.setContentsMargins(5, 5, 5, 5)
         self.setWindowTitle('Control Panel')
@@ -48,8 +48,6 @@ class MainMenu(QMainWindow):
         self.grid.addWidget(self.Controll(), 1, 1)
         lay.setLayout(self.grid)
         self.setCentralWidget(lay)
-
-
     def menu(self):
         global saved_color, send_email, cap_screen, record_video, smiley_face, dark_mode
         self.menubar = self.menuBar()
@@ -63,9 +61,12 @@ class MainMenu(QMainWindow):
         viewMenu.addAction(darkmode)
 
         settingsMenu = QMenu('Configuration', self)
-        email = QAction('Set Email', self)
-        email.triggered.connect(partial(self.verifyEmailAddress, ''))
-        email.setStatusTip('Your email address.')
+        self.email = QAction(f'Set Email - {email_address[0]}', self)
+        self.email.triggered.connect(partial(self.verifyEmailAddress, ''))
+        if email_address[0] == '':
+            self.email.setStatusTip('Your email address. Currently set too: None')
+        else:
+            self.email.setStatusTip(f'Your email address. Currently set too: {email_address[0]}')
 
         recordvideo = QAction('Record Video', self, checkable=True)
         recordvideo.setChecked(True if record_video[0] == 'True' else False)
@@ -93,7 +94,7 @@ class MainMenu(QMainWindow):
         self.faceDetection.setStatusTip('Enabled: Face detection. Disabled: Motion detection.')
         
         
-        settingsMenu.addAction(email)
+        settingsMenu.addAction(self.email)
         settingsMenu.addAction(recordvideo)
         settingsMenu.addAction(captureScreen)
         settingsMenu.addAction(sendEmails)
@@ -102,11 +103,9 @@ class MainMenu(QMainWindow):
 
         self.menubar.addMenu(viewMenu)
         self.menubar.addMenu(settingsMenu)
-
     def resizeEvent(self, event):
         super(MainMenu, self).resizeEvent(event)
         self.menubar.resize(self.width(), self.menubar.height())
-
     def verifyEmailAddress(self, s):
         global saved_color, send_email, cap_screen, record_video, smiley_face, dark_mode, email_delay, picture_delay, saved_color, settings_json, button_css, selected_data_index, face_detect, email_address
         import re
@@ -166,6 +165,8 @@ class MainMenu(QMainWindow):
                         for email in info['email address']:
                             email_address.append(email)
                 button = QMessageBox.information(self, "Success", f"The email: \"{email}\" has been successfully saved!", QMessageBox.Ok, QMessageBox.Ok)
+                self.email.setText(f'Set Email - {email_address[0]}')
+                self.email.setStatusTip(f'Your email address. Currently set too: {email_address[0]}')
             else:
                 button = QMessageBox.critical(self, "Wrong Email address.", f"\"{email}\" is an Invalid email address, please try again.", QMessageBox.Yes | QMessageBox.No, QMessageBox.Yes)
                 if button == QMessageBox.Yes:

@@ -5,6 +5,7 @@ from PyQt5.QtCore import *
 from PyQt5.QtGui import *
 from PyQt5 import *
 import sys, os, shutil, json, multiprocessing, cv2, threading
+from functools import partial
 from os import listdir
 from os.path import isfile, join
 # CAMERA SCRIPT
@@ -29,20 +30,77 @@ picture_delay = []
 selected_data_index = []
 button_css = ''
 
-class MainMenu(QWidget):
+# class MainMenu(QMainWindow):
+#     def __init__(self, parent = None):
+#         super(MainMenu, self).__init__(parent)
+#         self.form_widget = GUI(self)
+#         self.setCentralWidget(self.form_widget)
+
+class MainMenu(QMainWindow):
     def __init__(self, parent = None):
         super(MainMenu, self).__init__(parent)
+        self.menu()
+        # self.setMinimumSize(400, 320)
+        # background = QWidget(self)
+        lay = QVBoxLayout(self)
+        lay.setContentsMargins(5, 35, 5, 5)
         self.setWindowTitle('Control Panel')
         self.setWindowIcon(self.style().standardIcon(getattr(QStyle, 'SP_DialogNoButton')))
-        grid = QGridLayout()
-        grid.addWidget(self.DelayGroup(), 0, 0)
-        grid.addWidget(self.ComboBox(), 1, 0)
-        grid.addWidget(self.CheckGroup(), 0, 1)
-        grid.addWidget(self.Controll(), 1, 1)
-        self.setLayout(grid)
-        self.setMinimumSize(400, 260)        
-        self.ColorDialog.setStyleSheet(button_css)
+        self.grid = QGridLayout()
+        self.grid.addWidget(self.DelayGroup(), 0, 0)
+        self.grid.addWidget(self.ComboBox(), 1, 0)
+        self.grid.addWidget(self.CheckGroup(), 0, 1)
+        self.grid.addWidget(self.Controll(), 1, 1)
+        lay.addLayout(self.grid)
+        self.setLayout(lay)
 
+
+    def menu(self):
+        global saved_color, send_email, cap_screen, record_video, smiley_face, dark_mode
+        self.menubar = QMenuBar(self)
+        viewMenu = QMenu('View', self)
+        darkmode = QAction('Dark mode', self, checkable=True)
+        darkmode.setStatusTip('enable/disable Dark mode')
+        darkmode.setChecked(True if dark_mode[0] == 'True' else False)
+        darkmode.triggered.connect(partial(self.checkboxClicked, darkmode, 'Dark mode'))
+        viewMenu.addAction(darkmode)
+
+        settingsMenu = QMenu('Configuration', self)
+        email = QAction('Set Email', self)
+        email.triggered.connect(partial(self.verifyEmailAddress, ''))
+
+        recordvideo = QAction('Record Video', self, checkable=True)
+        recordvideo.setChecked(True if record_video[0] == 'True' else False)
+        recordvideo.triggered.connect(partial(self.checkboxClicked, recordvideo, 'Record Video'))
+        settingsMenu.addAction(email)
+        settingsMenu.addAction(recordvideo)
+
+        self.menubar.addMenu(viewMenu)
+        self.menubar.addMenu(settingsMenu)
+
+    def resizeEvent(self, event):
+        # calling the base class resizeEvent function is not usually required,
+        # but it is for certain widgets (especially item views or scroll areas),
+        # so just call it anyway, just to be sure, as it's a good habit to do that
+        super(MainMenu, self).resizeEvent(event)
+        # now that we have a direct reference to the menubar widget, we are also
+        # able to resize it, allowing all actions to be shown (as long as they
+        # are within the provided size
+        self.menubar.resize(self.width(), self.menubar.height())
+
+    def verifyEmailAddress(self, s):
+        import re
+        rx = re.compile(r"^[A-Za-z0-9\.\+_-]+@[A-Za-z0-9\._-]+\.[a-zA-Z]*$")
+        email, done1 = QInputDialog.getText(self, 'Email Verification', 'Email Address:', echo=QLineEdit.Normal, text=s)
+        if done1:
+            if rx.match(email):
+                button = QMessageBox.information(self, "Success", f"The email: \"{email}\" has been successfully saved!", QMessageBox.Ok, QMessageBox.Ok)
+            else:
+                button = QMessageBox.critical(self, "Wrong Email address.", f"\"{email}\" is an Invalid email address, please try again.", QMessageBox.Yes | QMessageBox.No, QMessageBox.Yes)
+                if button == QMessageBox.Yes:
+                    self.verifyEmailAddress(email)
+                else:
+                    return
     def ComboBox(self):
         global selected_data_index
         groupBox = QGroupBox("Recognition type")
@@ -74,7 +132,7 @@ class MainMenu(QWidget):
         captureScreen.setStyleSheet('background-color: hsl(126, 81%, 29%)') if cap_screen[0] == 'True' else captureScreen.setStyleSheet('background-color: rgb(106, 11, 11)')
         captureScreen.toggled.connect(lambda:self.checkboxClicked(captureScreen))
         captureScreen.setToolTip('Record your entire screen (*Very performance heavy)')
-        
+
         RecordVideo = QPushButton('Record Video')
         RecordVideo.setCheckable(True)
         RecordVideo.setChecked(True if record_video[0] == 'True' else False)
@@ -95,7 +153,7 @@ class MainMenu(QWidget):
         SmileyFace.setStyleSheet('background-color: hsl(126, 81%, 29%)') if smiley_face[0] == 'True' else SmileyFace.setStyleSheet('background-color: rgb(106, 11, 11)')
         SmileyFace.toggled.connect(lambda:self.checkboxClicked(SmileyFace))
         SmileyFace.setToolTip('Will draw a smiley face where your face is.')
-        
+
         DarkTheme = QPushButton('Dark mode')
         DarkTheme.setCheckable(True)
         DarkTheme.setChecked(True if dark_mode[0] == 'True' else False)
@@ -103,7 +161,7 @@ class MainMenu(QWidget):
         DarkTheme.setStyleSheet('background-color: hsl(126, 81%, 29%)') if dark_mode[0] == 'True' else DarkTheme.setStyleSheet('background-color: rgb(106, 11, 11)')
         DarkTheme.toggled.connect(lambda:self.checkboxClicked(DarkTheme))
         DarkTheme.setToolTip('Enabled Dark/Light theme for window.')
-        
+
         self.FaceDetection = QPushButton('Face Detection')
         self.FaceDetection.setCheckable(True)
         self.FaceDetection.setText('Face Detection' if face_detect[0] == 'True' else 'Motion Detection')
@@ -111,14 +169,14 @@ class MainMenu(QWidget):
         self.FaceDetection.setStyleSheet('background-color: hsl(126, 81%, 29%)') if face_detect[0] == 'True' else self.FaceDetection.setStyleSheet('background-color: rgb(106, 11, 11)')
         self.FaceDetection.toggled.connect(lambda:self.checkboxClicked(self.FaceDetection))
         self.FaceDetection.setToolTip('You can either use face detection or motion detection.')
-        
+
         vbox = QVBoxLayout()
-        vbox.addWidget(captureScreen)
-        vbox.addWidget(RecordVideo)
-        vbox.addWidget(EmailPictures)
-        vbox.addWidget(SmileyFace)
-        vbox.addWidget(DarkTheme)
-        vbox.addWidget(self.FaceDetection)
+        # vbox.addWidget(captureScreen)
+        # vbox.addWidget(RecordVideo)
+        # vbox.addWidget(EmailPictures)
+        # vbox.addWidget(SmileyFace)
+        # vbox.addWidget(DarkTheme)
+        # vbox.addWidget(self.FaceDetection)
         vbox.addStretch(1)
         groupBox.setLayout(vbox)
         return groupBox
@@ -131,7 +189,7 @@ class MainMenu(QWidget):
         self.EmailDelay.setValidator(QIntValidator())
         self.EmailDelay.textChanged.connect(self.lineEditChanged)
         self.EmailDelay.setToolTip(f'Program will wait {self.EmailDelay.text()} before sending another email')
-        
+
         Labe2 = QLabel('Take Picture Delay:')
         self.ImageDelay = QLineEdit(str(picture_delay[0]))
         self.ImageDelay.setValidator(QIntValidator())
@@ -223,7 +281,7 @@ class MainMenu(QWidget):
 
         self.EmailDelay.setToolTip(f'Program will wait {self.EmailDelay.text()} before sending another email')
         self.ImageDelay.setToolTip(f'Program will wait {self.ImageDelay.text()} before taking another picture (*Record video)')
-        
+
         if self.ImageDelay.text() == '':
             return
         if self.EmailDelay.text() == '':
@@ -339,10 +397,12 @@ class MainMenu(QWidget):
 
         button_css = 'background-color: rgb(' + str(saved_color[0]) + ', ' + str(saved_color[1]) + ', ' + str(saved_color[2]) + ');'
         self.ColorDialog.setStyleSheet(button_css)
-    def checkboxClicked(self,b):
+    def checkboxClicked(self, b, name, m):
+        print(b.isChecked())
+        print(name)
         global saved_color, send_email, cap_screen, record_video, smiley_face, dark_mode, email_delay, picture_delay, saved_color, settings_json, selected_data_index, face_detect
-        b.setStyleSheet('background-color: hsl(126, 81%, 29%)') if b.isChecked() == True else b.setStyleSheet('background-color: rgb(106, 11, 11)')
-        if b.text() == "Capture Screen":
+        # b.setStyleSheet('background-color: hsl(126, 81%, 29%)') if b.isChecked() == True else b.setStyleSheet('background-color: rgb(106, 11, 11)')
+        if name == "Capture Screen":
             if b.isChecked() == True:
                 settings_json.pop(0)
                 settings_json.append({
@@ -375,7 +435,7 @@ class MainMenu(QWidget):
                 })
                 with open(settings_file, mode='w+', encoding='utf-8') as file:
                     json.dump(settings_json, file, ensure_ascii=True, indent=4, sort_keys=False)
-        if b.text() == "Record Video":
+        if name == "Record Video":
             if b.isChecked() == True:
                 settings_json.pop(0)
                 settings_json.append({
@@ -408,7 +468,7 @@ class MainMenu(QWidget):
                 })
                 with open(settings_file, mode='w+', encoding='utf-8') as file:
                     json.dump(settings_json, file, ensure_ascii=True, indent=4, sort_keys=False)
-        if b.text() == "Send Emails":
+        if name == "Send Emails":
             if b.isChecked() == True:
                 settings_json.pop(0)
                 settings_json.append({
@@ -441,7 +501,7 @@ class MainMenu(QWidget):
                 })
                 with open(settings_file, mode='w+', encoding='utf-8') as file:
                     json.dump(settings_json, file, ensure_ascii=True, indent=4, sort_keys=False)
-        if b.text() == "Smiley Face Addon":
+        if name == "Smiley Face Addon":
             if b.isChecked() == True:
                 if face_detect[0] == 'False' or not self.cascadeList.currentIndex() == 7 and not self.cascadeList.currentIndex() == 6 and not self.cascadeList.currentIndex() == 5 and not self.cascadeList.currentIndex() == 4:
                     buttonReply = QMessageBox.question(self, "Enable 'face detection'", "You currently do not have 'face detection' enabled, if you want to get the best result, I would suggest you enable it.\nDo you want to enable 'face detection'?", QMessageBox.Yes | QMessageBox.No, QMessageBox.Yes)
@@ -480,7 +540,7 @@ class MainMenu(QWidget):
                 })
                 with open(settings_file, mode='w+', encoding='utf-8') as file:
                     json.dump(settings_json, file, ensure_ascii=True, indent=4, sort_keys=False)
-        if b.text() == "Dark mode" or b.text() == 'Light mode':
+        if name == "Dark mode" or name == 'Light mode':
             if b.isChecked() == True:
                 b.setText('Dark mode')
                 app.setStyle("Fusion")
@@ -543,7 +603,7 @@ class MainMenu(QWidget):
                 })
                 with open(settings_file, mode='w+', encoding='utf-8') as file:
                     json.dump(settings_json, file, ensure_ascii=True, indent=4, sort_keys=False)
-        if b.text() == "Face Detection" or b.text() == 'Motion Detection':
+        if name == "Face Detection" or name == 'Motion Detection':
             if b.isChecked() == True:
                 b.setText('Face Detection')
                 settings_json.pop(0)
@@ -631,6 +691,7 @@ class MainMenu(QWidget):
             # multiprocessing.Process(target=live.start_cam).start()
         # print(isActive)
 
+# class
 if __name__ == '__main__':
     if os.path.exists(settings_file):
         with open(settings_file) as file:

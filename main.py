@@ -40,10 +40,9 @@ class MainMenu(QMainWindow):
     def __init__(self, parent = None):
         super(MainMenu, self).__init__(parent)
         self.menu()
-        # self.setMinimumSize(400, 320)
-        # background = QWidget(self)
-        lay = QVBoxLayout(self)
-        lay.setContentsMargins(5, 35, 5, 5)
+        self.setMinimumSize(400, 320)
+        lay = QWidget(self)
+        lay.setContentsMargins(5, 5, 5, 5)
         self.setWindowTitle('Control Panel')
         self.setWindowIcon(self.style().standardIcon(getattr(QStyle, 'SP_DialogNoButton')))
         self.grid = QGridLayout()
@@ -51,13 +50,14 @@ class MainMenu(QMainWindow):
         self.grid.addWidget(self.ComboBox(), 1, 0)
         self.grid.addWidget(self.CheckGroup(), 0, 1)
         self.grid.addWidget(self.Controll(), 1, 1)
-        lay.addLayout(self.grid)
-        self.setLayout(lay)
+        lay.setLayout(self.grid)
+        self.setCentralWidget(lay)
 
 
     def menu(self):
         global saved_color, send_email, cap_screen, record_video, smiley_face, dark_mode
-        self.menubar = QMenuBar(self)
+        self.menubar = self.menuBar()
+        self.statusbar = self.statusBar()
         viewMenu = QMenu('View', self)
         darkmode = QAction('Dark mode', self, checkable=True)
         darkmode.setStatusTip('enable/disable Dark mode')
@@ -68,10 +68,12 @@ class MainMenu(QMainWindow):
         settingsMenu = QMenu('Configuration', self)
         email = QAction('Set Email', self)
         email.triggered.connect(partial(self.verifyEmailAddress, ''))
+        email.setStatusTip('Your email address.')
 
         recordvideo = QAction('Record Video', self, checkable=True)
         recordvideo.setChecked(True if record_video[0] == 'True' else False)
         recordvideo.triggered.connect(partial(self.checkboxClicked, recordvideo, 'Record Video'))
+        recordvideo.setStatusTip('Record footage of the webcam.')
         settingsMenu.addAction(email)
         settingsMenu.addAction(recordvideo)
 

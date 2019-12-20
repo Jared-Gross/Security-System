@@ -1,12 +1,19 @@
-import smtplib, os
+import smtplib, os, json
 from email.mime.text import MIMEText
 from email.mime.image import MIMEImage
 from email.mime.multipart import MIMEMultipart
 from datetime import datetime
 def email_picture(name, text):
-    EMAIL = 'xxxxxxxx@gmail.com'
-    EMAIL_TO = 'yyyyyyyy@gmail.com'
-    EMAIL_PASSWORD = YOUR PASSWORD HERE#<-
+    settings_file = os.path.dirname(os.path.realpath(__file__)) + '/settings.json'
+    email_address = []
+    with open(settings_file) as file:
+        settings_json = json.load(file)
+        for info in settings_json:
+            for email in info['email address']:
+                email_address.append(email)
+    EMAIL = 'jaredgrozz@gmail.com'
+    EMAIL_TO = email_address[0]
+    EMAIL_PASSWORD = 'ffvprugomuuywemq'#<-
     '''                                   \
                                            \
     DO NOT USE YOUR ACTUAL GMAIL PASSWORD!! \

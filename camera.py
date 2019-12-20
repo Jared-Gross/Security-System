@@ -132,6 +132,8 @@ def findFaceInImage(num):
     cascade = cv2.CascadeClassifier(cascade_files[int(selected_data_index[0])])
     eye_cascade = cv2.CascadeClassifier(cascade_files[0])
     mouth_cascade = cv2.CascadeClassifier(cascade_files[17])
+    eyes = []
+    mouth = []
     red, green, blue = int(saved_color[2]), int(saved_color[1]), int(saved_color[0])
     try:
         cropped_image_name = 'Cropped Image.png'
@@ -171,7 +173,7 @@ def findFaceInImage(num):
                         cv2.rectangle(img, (x, y), (x+w, y+h), (red, green, blue), 2)
                 img_cropped = cv2.imread(f'Face Detection/Pics/{num}.png')
                 crop_img = img_cropped[y:y+h, x:x+w]
-                cv2.putText(img, datetime.now().strftime("%A %d %B %Y %I:%M:%S%p"), (10, img.shape[0] - 10), cv2.FONT_HERSHEY_SIMPLEX, 0.35, (red, green, blue), 1)
+                cv2.putText(img, datetime.now().strftime("%A %d %B %Y %I:%M:%S%p"), (10, img.shape[0] - 10), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (red, green, blue), 1)
                 cv2.imwrite(f'Face Detection/Pics/{image_name}', img)
                 cv2.imwrite(f'Face Detection/Pics/{cropped_image_name}', crop_img)
                 print('Image Processed')
@@ -180,7 +182,7 @@ def findFaceInImage(num):
                 elif not faceDetection and not SMILEY_FACE: threading.Thread(target=email_picture, args=([image_name, cropped_image_name],f'Motion detected!\n Found {len(faces)} face/s',)).start()
                 elif not faceDetection and SMILEY_FACE:     threading.Thread(target=email_picture, args=([image_name, cropped_image_name],f'Motion detected!\n Found {len(faces)} face/s!\n Found {len(eyes)} eye/s!\n Found {len(mouth)} mouth/s!',)).start()
             elif not faceDetection:
-                cv2.putText(img, datetime.now().strftime("%A %d %B %Y %I:%M:%S%p"), (10, img.shape[0] - 10), cv2.FONT_HERSHEY_SIMPLEX, 0.35, (red, green, blue), 1)
+                cv2.putText(img, datetime.now().strftime("%A %d %B %Y %I:%M:%S%p"), (10, img.shape[0] - 10), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (red, green, blue), 1)
                 cv2.imwrite(f'Face Detection/Pics/{image_name}', img)
                 print('Image Processed')
                 threading.Thread(target=email_picture, args=([image_name, cropped_image_name],f'Motion detected!',)).start()
@@ -211,6 +213,8 @@ def camRun():
     threading.Thread(target = update_variables).start()
     eye_cascade = cv2.CascadeClassifier(cascade_files[0])
     mouth_cascade = cv2.CascadeClassifier(cascade_files[17])
+    eyes = []
+    mouth = []
     # construct the argument parser and parse the arguments
     ap = argparse.ArgumentParser()
     ap.add_argument("-v", "--video", help="path to the video file")
@@ -268,11 +272,10 @@ def camRun():
                     EMAIL_TIME = 0
                     print(f'Found {len(faces)} faces! Pictures taken: {numOfPics}')
                     savePicture(numOfPics)
-                    PROCESS_IMAGE = threading.Thread(target=findFaceInImage, args=(numOfPics,))
-                    PROCESS_IMAGE.start()
-                cv2.putText(frame, datetime.now().strftime("%A %d %B %Y %I:%M:%S%p"), (10, frame.shape[0] - 10), cv2.FONT_HERSHEY_SIMPLEX, 0.35, (red, green, blue), 1)
+                    threading.Thread(target=findFaceInImage, args=(numOfPics,)).start()
+                cv2.putText(frame, datetime.now().strftime("%A %d %B %Y %I:%M:%S%p"), (10, frame.shape[0] - 10), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (red, green, blue), 1)
             if SMILEY_FACE:
-                cv2.putText(frame, f"Found {len(faces)} face/s!  Found {len(eyes)} eye/s!  Found {len(mouth)} mouth/s!", (10, 20), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (red, green, blue), 2)
+                cv2.putText(frame, f"Found {len(faces)} face/s!  Found {len(eyes)} eye/s!  Found {len(mouth)} mouth/s!", (10, 20), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (red, green, blue), 1)
             else:
                 cv2.putText(frame, "{}".format(text), (10, 20), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (red, green, blue), 2)
         else:
@@ -308,10 +311,9 @@ def camRun():
                     EMAIL_TIME = 0
                     print(f'Found {len(cnts)} faces! Pictures taken: {numOfPics}')
                     savePicture(numOfPics)
-                    PROCESS_IMAGE = threading.Thread(target=findFaceInImage, args=(numOfPics,))
-                    PROCESS_IMAGE.start()
+                    threading.Thread(target=findFaceInImage, args=(numOfPics,)).start()
             cv2.putText(frame, "Room Status: {}".format(text), (10, 20), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (red, green, blue), 2)
-            cv2.putText(frame, datetime.now().strftime("%A %d %B %Y %I:%M:%S%p"), (10, frame.shape[0] - 10), cv2.FONT_HERSHEY_SIMPLEX, 0.35, (red, green, blue), 1)
+            cv2.putText(frame, datetime.now().strftime("%A %d %B %Y %I:%M:%S%p"), (10, frame.shape[0] - 10), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (red, green, blue), 1)
             # show the frame and record if the user presses a key
             # cv2.imshow("Thresh", thresh)
             # cv2.imshow("Frame Delta", frameDelta)
@@ -323,13 +325,8 @@ def camRun():
         if ret:
             cv2.imshow('Camera', frame)
         if isRunning == False:
-            cap.release()
-            cv2.destroyAllWindows()
-            # break
             btnStop()
         if cv2.waitKey(1) & 0xFF == ord('q'):
-            cap.release()
-            cv2.destroyAllWindows()
             btnStop()
 def exit_handler():
     print('Closing.. please wait.')

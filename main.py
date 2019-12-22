@@ -4,7 +4,7 @@ from PyQt5.QtWidgets import *
 from PyQt5.QtCore import *
 from PyQt5.QtGui import *
 from PyQt5 import *
-import sys, os, shutil, json, multiprocessing, cv2
+import sys, os, shutil, json, multiprocessing, cv2, atexit
 from functools import partial
 from os import listdir
 from os.path import isfile, join
@@ -31,25 +31,68 @@ email_delay = []
 picture_delay = []
 selected_data_index = []
 button_css = ''
+frame = ''
 
+running = True
+class Thread(QThread):
+    try:
+        changePixmap = pyqtSignal(QImage)
+        def run(self):
+            # cap = cv2.VideoCapture(0)
+            while running:
+                try:
+                    ret, frame = camera.camRun()
+                except:
+                    print('Reading error!')
+                if ret:
+                    rgbImage = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
+                    h, w, ch = rgbImage.shape
+                    bytesPerLine = ch * w
+                    convertToQtFormat = QImage(rgbImage.data, w, h, bytesPerLine, QImage.Format_RGB888)
+                    p = convertToQtFormat.scaled(640, 480, Qt.KeepAspectRatio)
+                    self.changePixmap.emit(p)
+    except:
+        print('Error getting Camera!')
+    finally:
+        print('Error reading camera')
 class MainMenu(QMainWindow):
     def __init__(self, parent = None):
         super(MainMenu, self).__init__(parent)
         self.menu()
-        self.setMinimumSize(400, 300)
-        lay = QWidget(self)
-        lay.setContentsMargins(5, 5, 5, 5)
+        mainlay = QWidget(self)
+        mainlay.setContentsMargins(5, 5, 5, 5)
+        lay = QVBoxLayout()
+        top = QHBoxLayout()
+        bottom = QHBoxLayout()
+        
         self.setWindowTitle('Control Panel')
-        self.setWindowIcon(self.style().standardIcon(getattr(QStyle, 'SP_DialogNoButton')))
+        self.setWindowIcon(self.style().standardIcon(getattr(QStyle, 'SP_DialogYesButton')))
+        self.cameraScreen = QLabel(self)
+        self.cameraScreen.setStyleSheet('border-radius: 3px; border-style: none; border: 1px solid black; background-color: rgb(10,10,10);')
+        self.cameraScreen.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
+        self.cameraScreen.setAlignment(Qt.AlignCenter)
+        top.addWidget(self.cameraScreen)
         self.grid = QGridLayout()
-        self.grid.addWidget(self.DelayGroup(), 0, 0)
+        self.grid.setRowStretch(0, 1)
         self.grid.addWidget(self.ComboBox(), 1, 0)
-        self.grid.addWidget(self.CheckGroup(), 0, 1)
-        self.grid.addWidget(self.Controll(), 1, 1)
-        lay.setLayout(self.grid)
-        self.setCentralWidget(lay)
+        bottom.addLayout(self.grid)
+        lay.addLayout(top)
+        lay.addLayout(bottom)
+        mainlay.setLayout(lay)
+        self.setCentralWidget(mainlay)\
+        
+        th = Thread(self)
+        th.changePixmap.connect(self.setImage)
+        camera.start_cam()
+        th.start()
+    def closeEvent(self, event):
+        print("X is clicked")
+        exit_handler()
+    @pyqtSlot(QImage)
+    def setImage(self, image):
+        self.cameraScreen.setPixmap(QPixmap.fromImage(image))
     def menu(self):
-        global saved_color, send_email, cap_screen, record_video, smiley_face, dark_mode
+        global saved_color, send_email, cap_screen, record_video, smiley_face, dark_mode, email_delay, picture_delay, saved_color, settings_json, selected_data_index, face_detect, email_address
         self.menubar = self.menuBar()
         self.statusbar = self.statusBar()
         viewMenu = QMenu('View', self)
@@ -64,10 +107,23 @@ class MainMenu(QMainWindow):
         self.email = QAction(f'Set Email - {email_address[0]}', self)
         self.email.triggered.connect(partial(self.verifyEmailAddress, ''))
         if email_address[0] == '':
-            self.email.setStatusTip('Your email address. Currently set too: None')
+            self.email.setStatusTip('Your email address is currently set too: None')
         else:
-            self.email.setStatusTip(f'Your email address. Currently set too: {email_address[0]}')
-
+            self.email.setStatusTip(f'Your email address is currently set too: {email_address[0]}')
+            
+        self.emailDelay = QAction(f'Set Email send delay - {email_delay[0]}')
+        self.emailDelay.triggered.connect(partial(self.verifyEmailDelay))
+        if email_delay[0] == '':
+            self.emailDelay.setStatusTip('Your email send delay is currently set too: None')
+        else:
+            self.emailDelay.setStatusTip(f'Your email send delay is currently set too: {email_delay[0]}')
+            
+        self.colorMenu = QAction(f'Color')
+        # self.colorMenu.setStyleSheet(button_css)
+        self.colorMenu.triggered.connect(partial(self.Open_Color_Dialog))
+        self.colorMenu.setStatusTip('Change the color of the bounding boxes in program.')
+        
+        
         recordvideo = QAction('Record Video', self, checkable=True)
         recordvideo.setChecked(True if record_video[0] == 'True' else False)
         recordvideo.triggered.connect(partial(self.checkboxClicked, recordvideo, 'Record Video'))
@@ -95,6 +151,8 @@ class MainMenu(QMainWindow):
         
         
         settingsMenu.addAction(self.email)
+        settingsMenu.addAction(self.emailDelay)
+        settingsMenu.addAction(self.colorMenu)
         settingsMenu.addAction(recordvideo)
         settingsMenu.addAction(captureScreen)
         settingsMenu.addAction(sendEmails)
@@ -166,7 +224,7 @@ class MainMenu(QMainWindow):
                             email_address.append(email)
                 button = QMessageBox.information(self, "Success", f"The email: \"{email}\" has been successfully saved!", QMessageBox.Ok, QMessageBox.Ok)
                 self.email.setText(f'Set Email - {email_address[0]}')
-                self.email.setStatusTip(f'Your email address. Currently set too: {email_address[0]}')
+                self.email.setStatusTip(f'Your email address is currently set too: {email_address[0]}')
             else:
                 button = QMessageBox.critical(self, "Wrong Email address.", f"\"{email}\" is an Invalid email address, please try again.", QMessageBox.Yes | QMessageBox.No, QMessageBox.Yes)
                 if button == QMessageBox.Yes:
@@ -189,111 +247,6 @@ class MainMenu(QMainWindow):
         # self.cascadeList.setStyleSheet('color: white')
         vbox = QVBoxLayout()
         vbox.addWidget(self.cascadeList)
-        vbox.addStretch(1)
-        groupBox.setLayout(vbox)
-
-        return groupBox
-    def CheckGroup(self):
-        global saved_color, send_email, cap_screen, record_video, smiley_face, dark_mode
-        groupBox = QGroupBox("Configuration")
-
-        # captureScreen = QCheckBox('Capture Screen')
-        captureScreen = QPushButton('Capture Screen')
-        captureScreen.setCheckable(True)
-        captureScreen.setChecked(True if cap_screen[0] == 'True' else False)
-        captureScreen.setStyleSheet('background-color: hsl(126, 81%, 29%)') if cap_screen[0] == 'True' else captureScreen.setStyleSheet('background-color: rgb(106, 11, 11)')
-        captureScreen.toggled.connect(lambda:self.checkboxClicked(captureScreen))
-        captureScreen.setToolTip('Record your entire screen (*Very performance heavy)')
-
-        RecordVideo = QPushButton('Record Video')
-        RecordVideo.setCheckable(True)
-        RecordVideo.setChecked(True if record_video[0] == 'True' else False)
-        RecordVideo.setStyleSheet('background-color: hsl(126, 81%, 29%)') if record_video[0] == 'True' else RecordVideo.setStyleSheet('background-color: rgb(106, 11, 11)')
-        RecordVideo.toggled.connect(lambda:self.checkboxClicked(RecordVideo))
-        RecordVideo.setToolTip('Record the webcam.')
-
-        EmailPictures = QPushButton('Send Emails')
-        EmailPictures.setCheckable(True)
-        EmailPictures.setChecked(True if send_email[0] == 'True' else False)
-        EmailPictures.setStyleSheet('background-color: hsl(126, 81%, 29%)') if send_email[0] == 'True' else EmailPictures.setStyleSheet('background-color: rgb(106, 11, 11)')
-        EmailPictures.toggled.connect(lambda:self.checkboxClicked(EmailPictures))
-        EmailPictures.setToolTip('Sends you an email for the movement it just detected.')
-
-        SmileyFace = QPushButton('Smiley Face Addon')
-        SmileyFace.setCheckable(True)
-        SmileyFace.setChecked(True if smiley_face[0] == 'True' else False)
-        SmileyFace.setStyleSheet('background-color: hsl(126, 81%, 29%)') if smiley_face[0] == 'True' else SmileyFace.setStyleSheet('background-color: rgb(106, 11, 11)')
-        SmileyFace.toggled.connect(lambda:self.checkboxClicked(SmileyFace))
-        SmileyFace.setToolTip('Will draw a smiley face where your face is.')
-
-        DarkTheme = QPushButton('Dark mode')
-        DarkTheme.setCheckable(True)
-        DarkTheme.setChecked(True if dark_mode[0] == 'True' else False)
-        DarkTheme.setText('Dark mode' if dark_mode[0] == 'True' else 'Light mode')
-        DarkTheme.setStyleSheet('background-color: hsl(126, 81%, 29%)') if dark_mode[0] == 'True' else DarkTheme.setStyleSheet('background-color: rgb(106, 11, 11)')
-        DarkTheme.toggled.connect(lambda:self.checkboxClicked(DarkTheme))
-        DarkTheme.setToolTip('Enabled Dark/Light theme for window.')
-
-        self.FaceDetection = QPushButton('Face Detection')
-        self.FaceDetection.setCheckable(True)
-        self.FaceDetection.setText('Face Detection' if face_detect[0] == 'True' else 'Motion Detection')
-        self.FaceDetection.setChecked(True if face_detect[0] == 'True' else False)
-        self.FaceDetection.setStyleSheet('background-color: hsl(126, 81%, 29%)') if face_detect[0] == 'True' else self.FaceDetection.setStyleSheet('background-color: rgb(106, 11, 11)')
-        self.FaceDetection.toggled.connect(lambda:self.checkboxClicked(self.FaceDetection))
-        self.FaceDetection.setToolTip('You can either use face detection or motion detection.')
-
-        vbox = QVBoxLayout()
-        # vbox.addWidget(captureScreen)
-        # vbox.addWidget(RecordVideo)
-        # vbox.addWidget(EmailPictures)
-        # vbox.addWidget(SmileyFace)
-        # vbox.addWidget(DarkTheme)
-        # vbox.addWidget(self.FaceDetection)
-        vbox.addStretch(1)
-        groupBox.setLayout(vbox)
-        return groupBox
-    def DelayGroup(self):
-        global email_delay, picture_delay, saved_color
-        groupBox = QGroupBox("Delays")
-
-        Label1 = QLabel('Email Sending Delay:')
-        self.EmailDelay = QLineEdit(str(email_delay[0]))
-        self.EmailDelay.setValidator(QIntValidator())
-        self.EmailDelay.textChanged.connect(self.lineEditChanged)
-        self.EmailDelay.setToolTip(f'Program will wait {self.EmailDelay.text()} before sending another email')
-
-        Labe2 = QLabel('Take Picture Delay:')
-        self.ImageDelay = QLineEdit(str(picture_delay[0]))
-        self.ImageDelay.setValidator(QIntValidator())
-        self.ImageDelay.textChanged.connect(self.lineEditChanged)
-        self.ImageDelay.setToolTip(f'Program will wait {self.ImageDelay.text()} before taking another picture (*Record video)')
-
-        Labe3 = QLabel('Color:')
-
-        self.ColorDialog = QPushButton('Box Color')
-        self.ColorDialog.clicked.connect(self.Open_Color_Dialog)
-        self.ColorDialog.setToolTip('Change the color of lines in face detection.')
-        self.ColorDialog.setStyleSheet(button_css)
-        vbox = QVBoxLayout()
-        vbox.addWidget(Label1)
-        vbox.addWidget(self.EmailDelay)
-        vbox.addWidget(Labe2)
-        vbox.addWidget(self.ImageDelay)
-        vbox.addWidget(Labe3)
-        vbox.addWidget(self.ColorDialog)
-        vbox.addStretch(1)
-        groupBox.setLayout(vbox)
-
-        return groupBox
-    def Controll(self):
-        groupBox = QGroupBox("Control")
-        self.start = QPushButton('Start', self)
-        self.start.setStyleSheet('background-color: hsl(126, 81%, 29%)')
-        self.start.setToolTip('Start/Stop the webcam')
-        self.start.setIcon(self.style().standardIcon(getattr(QStyle, 'SP_MediaPlay')))
-        self.start.clicked.connect(self.startCamera)
-        vbox = QVBoxLayout()
-        vbox.addWidget(self.start)
         vbox.addStretch(1)
         groupBox.setLayout(vbox)
 
@@ -352,75 +305,65 @@ class MainMenu(QMainWindow):
                     face_detect.append(face)
                 for email in info['email address']:
                     email_address.append(email)
-    def lineEditChanged(self):
-        global saved_color, send_email, cap_screen, record_video, smiley_face, dark_mode, email_delay, picture_delay, saved_color, settings_json, selected_data_index, face_detect, email_address
-
-        self.EmailDelay.setToolTip(f'Program will wait {self.EmailDelay.text()} before sending another email')
-        self.ImageDelay.setToolTip(f'Program will wait {self.ImageDelay.text()} before taking another picture (*Record video)')
-
-        if self.ImageDelay.text() == '':
-            return
-        if self.EmailDelay.text() == '':
-            return
-        if int(self.EmailDelay.text()) <= 6:
-            self.EmailDelay.setText('7')
-
-        if int(self.ImageDelay.text()) <= 4:
-            self.ImageDelay.setText('5')
-
-        if int(self.ImageDelay.text()) >= 4 and int(self.EmailDelay.text()) >= 6:
-            settings_json.pop(0)
-            settings_json.append({
-                "saved color": [saved_color[0], saved_color[1], saved_color[2]],
-                "capture screen": [cap_screen[0]],
-                "record video": [record_video[0]],
-                "smiley face": [smiley_face[0]],
-                "dark mode": [dark_mode[0]],
-                "send email": [send_email[0]],
-                "email delay": [int(self.EmailDelay.text())],
-                "picture delay": [int(self.ImageDelay.text())],
-                "selected data index": [selected_data_index[0]],
-                "face detect":[face_detect[0]],
-                "email address": [email_address[0]]
-            })
-            with open(settings_file, mode='w+', encoding='utf-8') as file:
-                json.dump(settings_json, file, ensure_ascii=True, indent=4, sort_keys=False)
-            with open(settings_file) as file:
-                saved_color.clear()
-                send_email.clear()
-                cap_screen.clear()
-                record_video.clear()
-                smiley_face.clear()
-                dark_mode.clear()
-                email_delay.clear()
-                picture_delay.clear()
-                selected_data_index.clear()
-                face_detect.clear()
-                email_address.clear()
-                settings_json = json.load(file)
-                for info in settings_json:
-                    for color in info['saved color']:
-                        saved_color.append(color)
-                    for screen in info['capture screen']:
-                        cap_screen.append(screen)
-                    for video in info['record video']:
-                        record_video.append(video)
-                    for email_b in info['send email']:
-                        send_email.append(email_b)
-                    for smile in info['smiley face']:
-                        smiley_face.append(smile)
-                    for dark in info['dark mode']:
-                        dark_mode.append(dark)
-                    for email_d in info['email delay']:
-                        email_delay.append(email_d)
-                    for picture in info['picture delay']:
-                        picture_delay.append(picture)
-                    for ind in info['selected data index']:
-                        selected_data_index.append(ind)
-                    for face in info['face detect']:
-                        face_detect.append(face)
-                    for email in info['email address']:
-                        email_address.append(email)
+    def verifyEmailDelay(self):
+        global saved_color, send_email, cap_screen, record_video, smiley_face, dark_mode, email_delay, picture_delay, saved_color, settings_json, button_css, selected_data_index, face_detect, email_address
+        delay, done1 = QInputDialog.getDouble(self, "Get double","Value:", 10, 0, 999999, 0)
+        if done1:
+            if delay >= 10:
+                settings_json.pop(0)
+                settings_json.append({
+                    "saved color": [saved_color[0], saved_color[1], saved_color[2]],
+                    "capture screen": [cap_screen[0]],
+                    "record video": [record_video[0]],
+                    "smiley face": [smiley_face[0]],
+                    "dark mode": [dark_mode[0]],
+                    "send email": [send_email[0]],
+                    "email delay": [delay],
+                    "picture delay": [picture_delay[0]],
+                    "selected data index": [int(self.cascadeList.currentIndex())],
+                    "face detect":[face_detect[0]],
+                    "email address": [email_address[0]]
+                })
+                with open(settings_file, mode='w+', encoding='utf-8') as file:
+                    json.dump(settings_json, file, ensure_ascii=True, indent=4, sort_keys=False)
+                with open(settings_file) as file:
+                    saved_color.clear()
+                    send_email.clear()
+                    cap_screen.clear()
+                    record_video.clear()
+                    smiley_face.clear()
+                    dark_mode.clear()
+                    email_delay.clear()
+                    picture_delay.clear()
+                    face_detect.clear()
+                    email_address.clear()
+                    settings_json = json.load(file)
+                    for info in settings_json:
+                        for color in info['saved color']:
+                            saved_color.append(color)
+                        for screen in info['capture screen']:
+                            cap_screen.append(screen)
+                        for video in info['record video']:
+                            record_video.append(video)
+                        for email_b in info['send email']:
+                            send_email.append(email_b)
+                        for smile in info['smiley face']:
+                            smiley_face.append(smile)
+                        for dark in info['dark mode']:
+                            dark_mode.append(dark)
+                        for email_d in info['email delay']:
+                            email_delay.append(email_d)
+                        for picture in info['picture delay']:
+                            picture_delay.append(picture)
+                        for ind in info['selected data index']:
+                            selected_data_index.append(ind)
+                        for face in info['face detect']:
+                            face_detect.append(face)
+                        for email in info['email address']:
+                            email_address.append(email)
+                # button = QMessageBox.information(self, "Success", f"The email: \"{email}\" has been successfully saved!", QMessageBox.Ok, QMessageBox.Ok)
+                self.emailDelay.setText(f'Set Email send delay - {email_delay[0]}')
+                self.emailDelay.setStatusTip(f'Your email send delay is currently set too: {email_delay[0]}')
     @pyqtSlot()
     def Open_Color_Dialog(self):
         global saved_color, send_email, cap_screen, record_video, smiley_face, dark_mode, email_delay, picture_delay, saved_color, settings_json, button_css, selected_data_index, face_detect, email_address
@@ -480,7 +423,8 @@ class MainMenu(QMainWindow):
                         email_address.append(email)
 
         button_css = 'background-color: rgb(' + str(saved_color[0]) + ', ' + str(saved_color[1]) + ', ' + str(saved_color[2]) + ');'
-        self.ColorDialog.setStyleSheet(button_css)
+        # self.ColorDialog.setStyleSheet(button_css)
+        # self.colorMenu.setStyleSheet(button_css)
     def checkboxClicked(self, b, name, m):
         print(b.isChecked())
         print(name)
@@ -769,29 +713,16 @@ class MainMenu(QMainWindow):
                     face_detect.append(face)
                 for email in info['email address']:
                     email_address.append(email)
-    def startCamera(self):
-        global isActive
-        isActive = not isActive
-        if not isActive:
-            self.start.setText('Start')
-            self.start.setStyleSheet('background-color: hsl(126, 81%, 29%)')
-            self.start.setIcon(self.style().standardIcon(getattr(QStyle, 'SP_MediaPlay')))
-            self.setWindowIcon(self.style().standardIcon(getattr(QStyle, 'SP_DialogNoButton')))
-            # multiprocessing.Process(target=live.end_cam).start()
-            camera.end_cam()
-        else:
-            self.start.setStyleSheet('background-color: rgb(106, 11, 11)')
-            self.start.setIcon(self.style().standardIcon(getattr(QStyle, 'SP_MediaStop')))
-            self.setWindowIcon(self.style().standardIcon(getattr(QStyle, 'SP_DialogYesButton')))
-            self.start.setText('Stop')
-            print('closed capture')
-            cv2.destroyAllWindows()
-            camera.start_cam()
-            # multiprocessing.Process(target=live.start_cam).start()
-        # print(isActive)
-
+def exit_handler():
+    running = False
+    print('Exit pressed')
+    camera.end_cam()
+    camera.cap.release()
+    cv2.destroyAllWindows()
+    # sys.exit()
 # class
 if __name__ == '__main__':
+    atexit.register(exit_handler)
     if os.path.exists(settings_file):
         with open(settings_file) as file:
             settings_json = json.load(file)

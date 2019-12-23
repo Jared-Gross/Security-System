@@ -86,7 +86,6 @@ class MainMenu(QMainWindow):
         camera.start_cam()
         th.start()
     def closeEvent(self, event):
-        print("X is clicked")
         exit_handler()
     @pyqtSlot(QImage)
     def setImage(self, image):

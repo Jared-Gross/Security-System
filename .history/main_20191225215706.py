@@ -742,7 +742,6 @@ class CycleMenu(QMainWindow):
         mainlay = QWidget(self)
         mainlay.setContentsMargins(5, 5, 5, 5)
         self.clock = QLabel(self)
-        self.currentTime = str(QTime.currentTime().toString(Qt.DefaultLocaleLongDate))
         self.grid = QGridLayout()
         # self.grid.setRowStretch(0, 1)
         self.grid.addWidget(self.clock, 0, 0)
@@ -754,24 +753,22 @@ class CycleMenu(QMainWindow):
         threading.Thread(target=self.updateClock).start()
     def updateClock(self):
         while running:
-            self.currentTime = str(QTime.currentTime().toString(Qt.DefaultLocaleLongDate))
-            self.clock.setText('Current time: ' + self.currentTime)
+            self.clock.setText('Current time: ' + str(QTime.currentTime().toString(Qt.DefaultLocaleLongDate)))
     def lay(self):
         global selected_data_index
         groupBox = QGroupBox(f"{(cycles)} - Cycles")
         grid = QGridLayout(self)
 
         addCycle = QPushButton('+')
+        subCycle = QPushButton('-')
         
         self.cascadeList = QComboBox()
         for i in range(cycles):
-            subCycle = QPushButton('-')
+            OnFrom = QLineEdit()
+            OnTo = QLineEdit()
             
-            OnFrom = QLineEdit(self.currentTime)
-            OnTo = QLineEdit(self.currentTime)
-            
-            OffFrom = QLineEdit(self.currentTime)
-            OffTo = QLineEdit(self.currentTime)
+            OffFrom = QLineEdit()
+            OffTo = QLineEdit()
             
             lblOnTo = QLabel(f'{i + 1}. On:')
             lblOnFrom = QLabel('to:')
@@ -794,10 +791,10 @@ class CycleMenu(QMainWindow):
             grid.addWidget(lblOffFrom, i + 1, 6)
             grid.addWidget(OffTo, i + 1, 5)
             grid.addWidget(OffFrom, i + 1, 7)
-            
-            grid.addWidget(subCycle, i + 1, 8) 
         
-        grid.addWidget(addCycle, i + 2, 8) 
+        grid.addWidget(addCycle, i + i + cycles + 1, 0) 
+        grid.addWidget(subCycle, i + i + cycles + 1, 1) 
+        # self.cascadeList.setStyleSheet('color: white')
         groupBox.setLayout(grid)
 
         return groupBox

@@ -766,12 +766,11 @@ class CycleMenu(QMainWindow):
         self.cascadeList = QComboBox()
         for i in range(cycles):
             subCycle = QPushButton('-')
-            
-            OnFrom = QLineEdit(self.currentTime)
-            OnTo = QLineEdit(self.currentTime)
+            OnFrom = QLineEdit()
+            OnTo = QLineEdit()
             
             OffFrom = QLineEdit(self.currentTime)
-            OffTo = QLineEdit(self.currentTime)
+            OffTo = QLineEdit()
             
             lblOnTo = QLabel(f'{i + 1}. On:')
             lblOnFrom = QLabel('to:')
@@ -797,7 +796,8 @@ class CycleMenu(QMainWindow):
             
             grid.addWidget(subCycle, i + 1, 8) 
         
-        grid.addWidget(addCycle, i + 2, 8) 
+        grid.addWidget(addCycle, i + i + cycles + 1, 0) 
+        # self.cascadeList.setStyleSheet('color: white')
         groupBox.setLayout(grid)
 
         return groupBox

@@ -797,7 +797,8 @@ class CycleMenu(QMainWindow):
             
             grid.addWidget(subCycle, i + 1, 8) 
         
-        grid.addWidget(addCycle, i + 2, 8) 
+        grid.addWidget(addCycle, i + 1, 8) 
+        # self.cascadeList.setStyleSheet('color: white')
         groupBox.setLayout(grid)
 
         return groupBox

@@ -1,13 +1,17 @@
+#!/usr/bin/env python3
 from PyQt5.QtMultimediaWidgets import *
 from PyQt5.QtMultimedia import *
 from PyQt5.QtWidgets import *
 from PyQt5.QtCore import *
 from PyQt5.QtGui import *
 from PyQt5 import *
-import sys, os, shutil, json, multiprocessing, cv2, atexit
+import sys, os, shutil, json, multiprocessing, cv2, atexit, threading
 from functools import partial
 from os import listdir
 from os.path import isfile, join
+
+# sudo python3 -m pip install --trusted-host pypi.python.org --trusted-host files.pythonhosted.org --trusted-host pypi.org [NAME]
+
 # CAMERA SCRIPT
 import camera
 settings_file = os.path.dirname(os.path.realpath(__file__)) + '/settings.json'
@@ -52,8 +56,10 @@ class Thread(QThread):
                     p = convertToQtFormat.scaled(640, 480, Qt.KeepAspectRatio)
                     self.changePixmap.emit(p)
     except:
+        running = False
         print('Error getting Camera!')
     finally:
+        running = False
         print('Error reading camera')
 class MainMenu(QMainWindow):
     def __init__(self, parent = None):
@@ -65,8 +71,8 @@ class MainMenu(QMainWindow):
         top = QHBoxLayout()
         bottom = QHBoxLayout()
         
-        self.setWindowTitle('Control Panel')
-        self.setWindowIcon(self.style().standardIcon(getattr(QStyle, 'SP_DialogYesButton')))
+        self.setWindowTitle('J-Detection - Main Menu')
+        self.setWindowIcon(self.style().standardIcon(getattr(QStyle, 'SP_MessageBoxInformation')))
         self.cameraScreen = QLabel(self)
         self.cameraScreen.setStyleSheet('border-radius: 3px; border-style: none; border: 1px solid black; background-color: rgb(10,10,10);')
         self.cameraScreen.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
@@ -79,12 +85,14 @@ class MainMenu(QMainWindow):
         lay.addLayout(top)
         lay.addLayout(bottom)
         mainlay.setLayout(lay)
-        self.setCentralWidget(mainlay)\
+        self.setCentralWidget(mainlay)
         
         th = Thread(self)
         th.changePixmap.connect(self.setImage)
         camera.start_cam()
         th.start()
+        self.c = CycleMenu()
+        self.c.show()
     def closeEvent(self, event):
         exit_handler()
     @pyqtSlot(QImage)
@@ -718,10 +726,83 @@ def exit_handler():
     camera.end_cam()
     camera.cap.release()
     cv2.destroyAllWindows()
-    # sys.exit()
+    sys.exit()
+    
+
+cycles = 4
+
+class CycleMenu(QMainWindow):
+    def __init__(self, parent = None):
+        
+        regexp = QtCore.QRegExp('[0-12]{0,2}[:][0-59]')
+        self.validator = QtGui.QRegExpValidator(regexp)
+        super(CycleMenu, self).__init__(parent)
+        self.setWindowTitle('J-Detection - Cycle Menu')
+        self.setWindowIcon(self.style().standardIcon(getattr(QStyle, 'SP_MessageBoxInformation')))
+        mainlay = QWidget(self)
+        mainlay.setContentsMargins(5, 5, 5, 5)
+        self.clock = QLabel(self)
+        self.grid = QGridLayout()
+        # self.grid.setRowStretch(0, 1)
+        self.grid.addWidget(self.clock, 0, 0)
+        self.grid.addWidget(self.lay(), 1, 0)
+        # mainlay.addLayout(self.grid)
+        mainlay.setLayout(self.grid)
+    
+        self.setCentralWidget(mainlay)
+        threading.Thread(target=self.updateClock).start()
+    def updateClock(self):
+        while running:
+            self.clock.setText('Current time: ' + str(QTime.currentTime().toString(Qt.DefaultLocaleLongDate)))
+    def lay(self):
+        global selected_data_index
+        groupBox = QGroupBox(f"{(cycles)} - Cycles")
+        grid = QGridLayout(self)
+
+        addCycle = QPushButton('+')
+        subCycle = QPushButton('-')
+        
+        self.cascadeList = QComboBox()
+        for i in range(cycles):
+            OnFrom = QLineEdit()
+            OnTo = QLineEdit()
+            
+            OffFrom = QLineEdit()
+            OffTo = QLineEdit()
+            
+            lblOnTo = QLabel('On to:')
+            lblOnFrom = QLabel('from:')
+            OnFrom.setValidator(self.validator)
+            OnTo.setValidator(self.validator)
+            
+            
+            lblOffTo = QLabel('Off to:')
+            lblOffFrom = QLabel('from:')
+            OffFrom.setValidator(self.validator)
+            OffTo.setValidator(self.validator)
+            
+            
+            grid.addWidget(lblOnTo, i + 1, 0)
+            grid.addWidget(lblOnFrom, i + 1, 2)
+            grid.addWidget(OnTo, i + 1, 1)
+            grid.addWidget(OnFrom, i + 1, 3)
+            
+            grid.addWidget(lblOffTo, i + i + 2, 0)
+            grid.addWidget(lblOffFrom, i + i + 2, 2)
+            grid.addWidget(OffTo, i + i + 2, 1)
+            grid.addWidget(OffFrom, i + i + 2, 3)
+        
+        grid.addWidget(addCycle, i + i + cycles + 1, 0) 
+        grid.addWidget(subCycle, i + i + cycles + 1, 1) 
+        # self.cascadeList.setStyleSheet('color: white')
+        groupBox.setLayout(grid)
+
+        return groupBox
 # class
 if __name__ == '__main__':
     atexit.register(exit_handler)
+    if not os.path.exists('Pics'):
+        os.mkdir('Pics')
     if os.path.exists(settings_file):
         with open(settings_file) as file:
             settings_json = json.load(file)

@@ -1,0 +1,8 @@
+[Desktop Entry]
+Version=1.0
+Name=J-Detection
+Terminal=true
+Comment=Security at its sharpest!
+Exec="/home/jared/Documents/Github Clones/Security-System/main.py"
+Icon="/home/jared/Documents/Github Clones/Security-System/icon.png"
+Type=Application

@@ -3,6 +3,7 @@ from email.mime.text import MIMEText
 from email.mime.image import MIMEImage
 from email.mime.multipart import MIMEMultipart
 from datetime import datetime
+
 def email_picture(name, text):
     settings_file = os.path.dirname(os.path.realpath(__file__)) + '/settings.json'
     email_address = []
@@ -42,12 +43,12 @@ def email_picture(name, text):
     # Define the image's ID as referenced above
     for i, j in enumerate(name):
         try:
-            with open(f'{os.path.dirname(os.path.realpath(__file__))}/Pics/{name[i]}', 'rb') as fp:
+            with open(f'Pics/{name[i]}', 'rb') as fp:
                 msgImage = MIMEImage(fp.read())
                 msgImage.add_header('Content-ID', f'<image>{i}')
                 msgRoot.attach(msgImage)
         except:
-            with open(f'{os.path.dirname(os.path.realpath(__file__))}/Pics/{name[0]}', 'rb') as fp:
+            with open(f'Pics/{name[0]}', 'rb') as fp:
                 msgImage = MIMEImage(fp.read())
                 msgImage.add_header('Content-ID', f'<image>{i}')
                 msgRoot.attach(msgImage)
@@ -58,7 +59,7 @@ def email_picture(name, text):
     smtp.sendmail(EMAIL, EMAIL_TO, msgRoot.as_string())
     smtp.quit()
     print('Email sent!')
-    image_folder = 'Face Detection/Pics'
+    image_folder = 'Pics'
     for the_file in os.listdir(image_folder):
         file_path = os.path.join(image_folder, the_file)
         try:

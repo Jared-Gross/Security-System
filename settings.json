@@ -1,0 +1,39 @@
+[
+    {
+        "saved color": [
+            32,
+            74,
+            135
+        ],
+        "capture screen": [
+            "False"
+        ],
+        "record video": [
+            "False"
+        ],
+        "smiley face": [
+            "False"
+        ],
+        "dark mode": [
+            "True"
+        ],
+        "send email": [
+            "False"
+        ],
+        "email delay": [
+            10.0
+        ],
+        "picture delay": [
+            "5"
+        ],
+        "selected data index": [
+            15
+        ],
+        "face detect": [
+            "True"
+        ],
+        "email address": [
+            "jaredgrozz@gmail.com"
+        ]
+    }
+]

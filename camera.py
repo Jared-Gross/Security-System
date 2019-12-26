@@ -2,7 +2,8 @@ import cv2, mss, os, os.path, shutil, time, logging, threading, time, sys, atexi
 from multiprocessing import Process
 from imutils.video import VideoStream
 from os.path import isfile, join
-from PIL import Image, ImageGrab
+import pyscreenshot as ImageGrab
+# from PIL import Image, ImageGrab
 import moviepy.editor as mp
 from datetime import datetime
 import natsort as nt
@@ -48,7 +49,7 @@ selected_data_index = []
 
 red, green, blue = 0, 0, 0
 frame = ''
-image_folder = '/Pics'
+image_folder = 'Pics'
 video_name = os.path.dirname(os.path.realpath(__file__)) + '/temp.avi'
 numOfPics = 0
 cascade = cv2.CascadeClassifier(cascade_files[0])
@@ -85,11 +86,11 @@ def savePicture(num):
     if not captureScreen:
         # CAPTURE WEBCAM
         return_value, image = cap.read()
-        cv2.imwrite("/Pics/{0}.png".format(num),image)
+        cv2.imwrite("Pics/{0}.png".format(num),image)
     else:
         # CAPTURE SCREEN
         with mss.mss() as sct:
-            filename = sct.shot(output=f'/Pics/{num}.png')
+            filename = sct.shot(output=f'Pics/{num}.png')
 def findFaceInImage(num):
     global TIME, EMAIL_TIME, numOfPics, captureScreen, recording, email_pictures, SMILEY_FACE, SEND_EMAIL_DELAY, START_TIME, cascade
     global saved_color, send_email, cap_screen, record_video, smiley_face, dark_mode, email_delay, picture_delay, saved_color, settings_json, selected_data_index, red, green, blue
@@ -142,7 +143,7 @@ def findFaceInImage(num):
     try:
         cropped_image_name = 'Cropped Image.png'
         image_name = 'Image.png'
-        img = cv2.imread(f'/Pics/{num}.png')
+        img = cv2.imread(f'Pics/{num}.png')
         if img.any() or img.all():
             gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
             faces = cascade.detectMultiScale(
@@ -162,12 +163,10 @@ def findFaceInImage(num):
                         roi_gray_mouth = gray[y+(int(h/2)):y+h, x:x+w]
                         roi_color_mouth = img[y+(int(h/2)):y+h, x:x+w]
                         mouth = mouth_cascade.detectMultiScale(roi_gray_mouth)
-
                         # EYES
                         roi_gray_eye = gray[y-(int(h/2)):y+h, x:x+w]
                         roi_color_eye = img[y-(int(h/2)):y+h, x:x+w]
                         eyes = eye_cascade.detectMultiScale(roi_gray_eye)
-
                         for (ex,ey,ew,eh) in eyes:
                             d = int(ew / 2)
                             cv2.circle(roi_color_eye, (int(ex + ew / 4) + int(d / 2), int(ey + eh / 4) + int(d / 2)), int(d) ,(blue,green,red),2)
@@ -175,11 +174,11 @@ def findFaceInImage(num):
                             cv2.ellipse(roi_color_mouth, (int(ex + ew / 2), int(ey + eh / 8)), (int(ex), int(ey)), 0, 25, 155, (blue,green,red), 2)
                     else:
                         cv2.rectangle(img, (x, y), (x+w, y+h), (red, green, blue), 2)
-                img_cropped = cv2.imread(f'/Pics/{num}.png')
+                img_cropped = cv2.imread(f'Pics/{num}.png')
                 crop_img = img_cropped[y:y+h, x:x+w]
                 cv2.putText(img, datetime.now().strftime("%A %d %B %Y %I:%M:%S%p"), (10, img.shape[0] - 10), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (red, green, blue), 1)
-                cv2.imwrite(f'/Pics/{image_name}', img)
-                cv2.imwrite(f'/Pics/{cropped_image_name}', crop_img)
+                cv2.imwrite(f'Pics/{image_name}', img)
+                cv2.imwrite(f'Pics/{cropped_image_name}', crop_img)
                 print('Image Processed')
                 if faceDetection and SMILEY_FACE:           threading.Thread(target=email_picture, args=([image_name, cropped_image_name],f'Found {len(faces)} face/s!\n Found {len(eyes)} eye/s!\n Found {len(mouth)} mouth/s!',)).start()
                 elif faceDetection and not SMILEY_FACE:     threading.Thread(target=email_picture, args=([image_name, cropped_image_name],f'Found {len(faces)} face/s!',)).start()
@@ -187,7 +186,7 @@ def findFaceInImage(num):
                 elif not faceDetection and SMILEY_FACE:     threading.Thread(target=email_picture, args=([image_name, cropped_image_name],f'Motion detected!\n Found {len(faces)} face/s!\n Found {len(eyes)} eye/s!\n Found {len(mouth)} mouth/s!',)).start()
             elif not faceDetection:
                 cv2.putText(img, datetime.now().strftime("%A %d %B %Y %I:%M:%S%p"), (10, img.shape[0] - 10), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (red, green, blue), 1)
-                cv2.imwrite(f'/Pics/{image_name}', img)
+                cv2.imwrite(f'Pics/{image_name}', img)
                 print('Image Processed')
                 threading.Thread(target=email_picture, args=([image_name, cropped_image_name],f'Motion detected!',)).start()
             print ("Found {0} faces!".format(len(faces)))

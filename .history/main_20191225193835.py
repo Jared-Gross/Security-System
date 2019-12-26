@@ -787,10 +787,10 @@ class CycleMenu(QMainWindow):
             grid.addWidget(OnTo, i + 1, 1)
             grid.addWidget(OnFrom, i + 1, 3)
             
-            grid.addWidget(lblOffTo, i + 2, 0)
-            grid.addWidget(lblOffFrom, i + 2, 2)
-            grid.addWidget(OffTo, i + 2, 1)
-            grid.addWidget(OffFrom, i + 2, 3)
+            grid.addWidget(lblOffTo, i + i + 2, 0)
+            grid.addWidget(lblOffFrom, i + i + 2, 2)
+            grid.addWidget(OffTo, i + i + 2, 1)
+            grid.addWidget(OffFrom, i + i + 2, 3)
         
         grid.addWidget(addCycle, i + i + cycles + 1, 0) 
         grid.addWidget(subCycle, i + i + cycles + 1, 1) 

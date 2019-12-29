@@ -975,8 +975,7 @@ class CycleMenu(QMainWindow):
                     OffToList.append(OffTo)
                 for OffFrom in info['OffFrom']:
                     OffFromList.append(OffFrom)
-    def delete_cycle(self, key):
-        
+
     def btnAdd(self):
         global cycles, OffFromList, OffToList, OnFromList, cycles_json
         OffFromList.clear()

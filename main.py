@@ -44,42 +44,11 @@ OnToList = []
 OnFromList = []
 OffToList = []
 OffFromList = []
+alwaysOn = []
 
 running = True
 
 framesPerSecond = 0
-class Thread(QThread):
-    try:
-        changePixmap = pyqtSignal(QImage)
-        def run(self):
-            start_time = time.time()
-            x = 1 # displays the frame rate every 1 second
-            counter = 0
-            # cap = cv2.VideoCapture(0)
-            while running:
-                try:
-                    ret, frame = camera.camRun()
-                except:
-                    print('Reading error!')
-                if ret:
-                    rgbImage = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
-                    h, w, ch = rgbImage.shape
-                    bytesPerLine = ch * w
-                    convertToQtFormat = QImage(rgbImage.data, w, h, bytesPerLine, QImage.Format_RGB888)
-                    p = convertToQtFormat.scaled(640, 480, Qt.KeepAspectRatio)
-                    self.changePixmap.emit(p)
-                counter+=1
-                if (time.time() - start_time) > x :
-                    global framesPerSecond
-                    framesPerSecond = counter / (time.time() - start_time)
-                    counter = 0
-                    start_time = time.time()
-    except:
-        running = False
-        print('Error getting Camera!')
-    finally:
-        running = False
-        print('Error reading camera')
 class MainMenu(QMainWindow):
     def __init__(self, parent = None):
         super(MainMenu, self).__init__(parent)
@@ -106,10 +75,14 @@ class MainMenu(QMainWindow):
         mainlay.setLayout(lay)
         self.setCentralWidget(mainlay)
         
+        # cap = cv2.VideoCapture(0)
+        # if camera.cap is None or not cap.isOpened():
+        #     QMessageBox.critical(self, 'Camera Error!', 'Can\'t find a camera, or camera is already running in an other program.', QMessageBox.Ok, QMessageBox.Ok)
         th = Thread(self)
         th.changePixmap.connect(self.setImage)
         camera.start_cam()
         th.start()
+    def open_cycle_menu(self):
         self.c = CycleMenu()
         self.c.show()
     def closeEvent(self, event):
@@ -146,9 +119,14 @@ class MainMenu(QMainWindow):
             self.emailDelay.setStatusTip(f'Your email send delay is currently set too: {email_delay[0]}')
             
         self.colorMenu = QAction(f'Color')
-        # self.colorMenu.setStyleSheet(button_css)
         self.colorMenu.triggered.connect(partial(self.Open_Color_Dialog))
         self.colorMenu.setStatusTip('Change the color of the bounding boxes in program.')
+        
+        self.cycleMenu = QAction(f'Cycle Menu')
+        self.cycleMenu.triggered.connect(partial(self.open_cycle_menu))
+        self.cycleMenu.setStatusTip('Custimze when the program is active.')
+        
+        
         
         
         recordvideo = QAction('Record Video', self, checkable=True)
@@ -180,8 +158,9 @@ class MainMenu(QMainWindow):
         settingsMenu.addAction(self.email)
         settingsMenu.addAction(self.emailDelay)
         settingsMenu.addAction(self.colorMenu)
-        settingsMenu.addAction(recordvideo)
-        settingsMenu.addAction(captureScreen)
+        settingsMenu.addAction(self.cycleMenu)
+        # settingsMenu.addAction(recordvideo)
+        # settingsMenu.addAction(captureScreen)
         settingsMenu.addAction(sendEmails)
         settingsMenu.addAction(smileyFace)
         settingsMenu.addAction(self.faceDetection)
@@ -739,31 +718,83 @@ class MainMenu(QMainWindow):
                     face_detect.append(face)
                 for email in info['email address']:
                     email_address.append(email)
-def exit_handler():
-    running = False
-    print('Exit pressed')
-    camera.end_cam()
-    camera.cap.release()
-    cv2.destroyAllWindows()
-    sys.exit()
 all_textboxes = []
 OnTo_textboxes = []
 OnFrom_textboxes = []
 OffTo_textboxes = []
 OffFrom_textboxes = []
+all_avail_times = ['1 AM',
+                   '2 AM',
+                   '3 AM',
+                   '4 AM',
+                   '5 AM',
+                   '6 AM',
+                   '7 AM',
+                   '8 AM',
+                   '9 AM',
+                   '10 AM',
+                   '11 AM',
+                   '12 AM',
+                   '1 PM',
+                   '2 PM',
+                   '3 PM',
+                   '4 PM',
+                   '5 PM',
+                   '6 PM',
+                   '7 PM',
+                   '8 PM',
+                   '9 PM',
+                   '10 PM',
+                   '11 PM',
+                   '12 PM',]
+class Thread(QThread):
+    try:
+        changePixmap = pyqtSignal(QImage)
+        def run(self):
+            start_time = time.time()
+            x = 1 # displays the frame rate every 1 second
+            counter = 0
+            n = 0
+            while running:
+                try:
+                    if running: ret, frame = camera.camRun()
+                except:
+                    n += 1
+                    if n >= 2:
+                        exit_handler()
+                if ret:
+                    rgbImage = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
+                    h, w, ch = rgbImage.shape
+                    bytesPerLine = ch * w
+                    convertToQtFormat = QImage(rgbImage.data, w, h, bytesPerLine, QImage.Format_RGB888)
+                    p = convertToQtFormat.scaled(640, 480, Qt.KeepAspectRatio)
+                    self.changePixmap.emit(p)
+                counter+=1
+                if (time.time() - start_time) > x :
+                    global framesPerSecond
+                    framesPerSecond = counter / (time.time() - start_time)
+                    counter = 0
+                    start_time = time.time()
+    except:
+        running = False
+    finally:
+        running = False
 class CycleMenu(QMainWindow):
     def __init__(self, parent = None):
-        global cycles, OffFromList, OffToList, OnToList, OnFromList
+        global cycles, alwaysOn, OffFromList, OffToList, OnToList, OnFromList
         OffFromList.clear()
         OffToList.clear()
         OnFromList.clear()
         OnToList.clear()
+        alwaysOn.clear()
         if os.path.exists(cycles_file):
             with open(cycles_file) as file:
                 cycles_json = json.load(file)
                 for info in cycles_json:
                     for c in info['cycles']:
                         cycles = int(c)
+                    for on in info['always on']:
+                        alwaysOn.append(on)
                     for OnTo in info['OnTo']:
                         OnToList.append(OnTo)
                     for OnFrom in info['OnFrom']:
@@ -777,6 +808,9 @@ class CycleMenu(QMainWindow):
             file.write('''[{
         "cycles": [
             "1"
+        ],
+        "always on":[
+            "False"
         ],
         "OnTo": [
             ""
@@ -796,6 +830,8 @@ class CycleMenu(QMainWindow):
                 for info in cycles_json:
                     for c in info['cycles']:
                         cycles = int(c)
+                    for on in info['always on']:
+                        alwaysOn.append(on)
                     for OnTo in info['OnTo']:
                         OnToList.append(OnTo)
                     for OnFrom in info['OnFrom']:
@@ -804,7 +840,8 @@ class CycleMenu(QMainWindow):
                         OffToList.append(OffTo)
                     for OffFrom in info['OffFrom']:
                         OffFromList.append(OffFrom)
-        regexp = QtCore.QRegExp('[0,1][0-9][:][0-5][0-9][a,p][m]')
+        # regexp = QtCore.QRegExp('[0,1][0-9][:][0-5][0-9][a,p][m]')
+        regexp = QtCore.QRegExp('[a-z-A-Z-0-9-:_]{0,7}')
         self.validator = QtGui.QRegExpValidator(regexp)
         super(CycleMenu, self).__init__(parent)
         self.setWindowTitle('J-Detection - Cycle Menu')
@@ -837,14 +874,28 @@ class CycleMenu(QMainWindow):
                 else:
                     self.clearLayout(item.layout())
     def lay(self):
-        global selected_data_index, cycles, all_textboxes
-        groupBox = QGroupBox(f"{(cycles)} - Cycles")
-        grid = QGridLayout(self)
-
+        global selected_data_index, cycles, all_textboxes, OnTo_textboxes, OnFrom_textboxes, OffTo_textboxes, OffFrom_textboxes
+        self.scroll = QScrollArea(self)
+        self.scroll.move(7, 80)
+        self.scroll.setWidgetResizable(True)
+        self.content = QWidget()
+        self.scroll.setWidget(self.content)
+        grid = QGridLayout(self.content)
+        self.setWindowTitle(f'J-Detection - Cycle Menu - {cycles} - Cycles')
+        # groupBox = QGroupBox(f"{(cycles)} - Cycles")
+        
+        # grid = QGridLayout(self)
+        self.radAlwaysOn = QCheckBox('Always on?')
+        # self.radAlwaysOn.stateChanged.connect(self.delete_save_saveCycles)
+        self.radAlwaysOn.clicked.connect(self.delete_save_saveCycles)
+        self.radAlwaysOn.setChecked(True if alwaysOn[0] == 'True' else False)
+        grid.addWidget(self.radAlwaysOn, 0, 0) 
         addCycle = QPushButton('+')
         addCycle.clicked.connect(self.btnAdd)
-        btnSubmit = QPushButton('Submit')
+        btnSubmit = QPushButton()
         btnSubmit.clicked.connect(self.save_cycles)
+        btnSubmit.setIcon(self.style().standardIcon(getattr(QStyle, 'SP_DialogApplyButton')))
+        btnSubmit.clicked.connect(self.submit)
         all_textboxes.clear()
         OnTo_textboxes.clear()
         OnFrom_textboxes.clear()
@@ -852,7 +903,16 @@ class CycleMenu(QMainWindow):
         OffFrom_textboxes.clear()
         self.cascadeList = QComboBox()
         for i in range(cycles):
-            subCycle = QPushButton('-')
+            subCycle = QPushButton('x')
+            subCycle.clicked.connect(partial(self.delete_cycle, i))
+            
+            btnUp = QPushButton()
+            btnUp.clicked.connect(partial(self.up_arrow, i))
+            btnUp.setIcon(self.style().standardIcon(getattr(QStyle, 'SP_ArrowUp')))
+            
+            btnDown = QPushButton()
+            btnDown.clicked.connect(partial(self.down_arrow, i))
+            btnDown.setIcon(self.style().standardIcon(getattr(QStyle, 'SP_ArrowDown')))
             
             OnFrom = QLineEdit(self.currentTime)
             OnTo = QLineEdit(self.currentTime)
@@ -860,37 +920,48 @@ class CycleMenu(QMainWindow):
             OffFrom = QLineEdit(self.currentTime)
             OffTo = QLineEdit(self.currentTime)
             
+            # OnFrom = QComboBox()
+            # OnTo = QComboBox()
+            
+            # OffFrom = QComboBox()
+            # OffTo = QComboBox()
+            # OffTo.addItems(all_avail_times)
+            
             lblOnTo = QLabel(f'{i + 1}. On:')
             lblOnFrom = QLabel('to:')
             OnFrom.setValidator(self.validator)
             OnFrom.setText(str(OnFromList[i]))
-            OnFrom.textChanged.connect(self.save_cycles)
+            OnFrom.textChanged.connect(partial(self.save_cycles))
             OnTo.setValidator(self.validator)
             OnTo.setText(str(OnToList[i]))
-            OnTo.textChanged.connect(self.save_cycles)
+            OnTo.textChanged.connect(partial(self.save_cycles))
             
             
             lblOffTo = QLabel('Off:')
             lblOffFrom = QLabel('to:')
             OffFrom.setValidator(self.validator)
             OffFrom.setText(str(OffFromList[i]))
-            OffFrom.textChanged.connect(self.save_cycles)
+            OffFrom.textChanged.connect(partial(self.save_cycles))
             OffTo.setValidator(self.validator)
             OffTo.setText(str(OffToList[i]))
-            OffTo.textChanged.connect(self.save_cycles)
+            OffTo.textChanged.connect(partial(self.save_cycles))
             
             
-            grid.addWidget(lblOnTo, i, 0)
-            grid.addWidget(lblOnFrom, i, 2)
-            grid.addWidget(OnTo, i, 1)
-            grid.addWidget(OnFrom, i, 3)
+            grid.addWidget(lblOnTo, i + 1, 0)
+            grid.addWidget(lblOnFrom, i + 1, 2)
+            grid.addWidget(OnTo, i + 1, 1)
+            grid.addWidget(OnFrom, i + 1, 3)
             
-            grid.addWidget(lblOffTo, i, 4)
-            grid.addWidget(lblOffFrom, i, 6)
-            grid.addWidget(OffTo, i, 5)
-            grid.addWidget(OffFrom, i , 7)
+            grid.addWidget(lblOffTo, i + 1, 4)
+            grid.addWidget(lblOffFrom, i + 1, 6)
+            grid.addWidget(OffTo, i + 1, 5)
+            grid.addWidget(OffFrom, i + 1, 7)
             
-            grid.addWidget(subCycle, i , 8) 
+            grid.addWidget(subCycle, i + 1, 8) 
+            if not i == 0:
+                grid.addWidget(btnUp, i + 1, 9) 
+            if not i == cycles - 1:
+                grid.addWidget(btnDown, i + 1, 10) 
 
             OnTo_textboxes.append(OnTo)
             OnFrom_textboxes.append(OnFrom)
@@ -901,54 +972,89 @@ class CycleMenu(QMainWindow):
             all_textboxes.append(OffTo)
             all_textboxes.append(OffFrom)
         
-        grid.addWidget(addCycle, cycles + 2, 8) 
-        grid.addWidget(btnSubmit, cycles + 3, 8) 
-        groupBox.setLayout(grid)
+        grid.addWidget(addCycle, cycles + 3, 8) 
+        grid.addWidget(btnSubmit, cycles + 4, 8) 
+        # groupBox.setLayout(grid)
 
-        return groupBox
+        # return groupBox
+        return self.scroll
+    def up_arrow(self, key):
+        global cycles, OffFromList, OffToList, OnFromList, onToList, OnTo_textboxes, OnFrom_textboxes, OffTo_textboxes, OffFrom_textboxes
+        up = key - 1
+        OffTo_textboxes[key], OffTo_textboxes[up] = OffTo_textboxes[up], OffTo_textboxes[key]
+        OffFrom_textboxes[key], OffFrom_textboxes[up] = OffFrom_textboxes[up], OffFrom_textboxes[key]
+        OnTo_textboxes[key], OnTo_textboxes[up] = OnTo_textboxes[up], OnTo_textboxes[key]
+        OnFrom_textboxes[key], OnFrom_textboxes[up] = OnFrom_textboxes[up], OnFrom_textboxes[key]
+        self.delete_save_saveCycles()
+        self.clearLayout(self.grid)
+        self.grid.addWidget(self.lay(), 1, 0)
+    def down_arrow(self, key):
+        global cycles, OffFromList, OffToList, OnFromList, onToList, OnTo_textboxes, OnFrom_textboxes, OffTo_textboxes, OffFrom_textboxes
+        down = key + 1
+        OffTo_textboxes[key], OffTo_textboxes[down] = OffTo_textboxes[down], OffTo_textboxes[key]
+        OffFrom_textboxes[key], OffFrom_textboxes[down] = OffFrom_textboxes[down], OffFrom_textboxes[key]
+        OnTo_textboxes[key], OnTo_textboxes[down] = OnTo_textboxes[down], OnTo_textboxes[key]
+        OnFrom_textboxes[key], OnFrom_textboxes[down] = OnFrom_textboxes[down], OnFrom_textboxes[key]
+        self.delete_save_saveCycles()
+        self.clearLayout(self.grid)
+        self.grid.addWidget(self.lay(), 1, 0)
     def save_cycles(self):
-        global cycles, OffFromList, OffToList, OnFromList, cycles_json, all_textboxes
+        global cycles, OffFromList, OffToList, OnFromList, onToList, cycles_json, all_textboxes
         for i, j in enumerate(all_textboxes):
+            temp = j.text()
+            temp = temp.replace(' ', '')
+            temp = temp.lower()
             rx = re.compile(r"[0,1][0-9][:][0-5][0-9][a,p][m]")
-            if not rx.match(j.text()):
-                print(j.text() + 'doesnt match')
+            if not rx.match(temp):
                 return
+        self.delete_save_saveCycles()
+    def delete_cycle(self, key):
+        global cycles, OnTo_textboxes, OnFrom_textboxes, OffTo_textboxes, OffFrom_textboxes
+        cycles -= 1
+        
+        del OnTo_textboxes[key]
+        del OnFrom_textboxes[key]
+        del OffTo_textboxes[key]
+        del OffFrom_textboxes[key]
+        self.delete_save_saveCycles()
+                    
+        self.clearLayout(self.grid)
+        self.grid.addWidget(self.lay(), 1, 0)      
+    def delete_save_saveCycles(self):
+        global cycles, alwaysOn, OffFromList, OffToList, OnFromList, onToList, OnTo_textboxes, OnFrom_textboxes, OffTo_textboxes, OffFrom_textboxes
         OffFromList.clear()
         OffToList.clear()
         OnFromList.clear()
         OnToList.clear()
-        
-        OnToText = []
-        OnFromText = []
-        OffToText = []
-        OffFromText = []
+        # alwaysOn.clear()
         
         with open(cycles_file) as file:
             cycles_json = json.load(file)
-        #     for info in cycles_json:
-        #         for c in info['cycles']:
-        #             cycles = int(c)
-        #         for OnTo in info['OnTo']:
-        #             OnToList.append(OnTo)
-        #         for OnFrom in info['OnFrom']:
-        #             OnFromList.append(OnFrom)
-        #         for OffTo in info['OffTo']:
-        #             OffToList.append(OffTo)
-        #         for OffFrom in info['OffFrom']:
-        #             OffFromList.append(OffFrom)
-                    
         for i, j in enumerate(OnTo_textboxes):
-            OnToList.append(j.text())
+            temp = j.text()
+            temp = temp.replace(' ', '')
+            temp = temp.lower()
+            OnToList.append(temp)
         for i, j in enumerate(OnFrom_textboxes):
-            OnFromList.append(j.text())
+            temp = j.text()
+            temp = temp.replace(' ', '')
+            temp = temp.lower()
+            OnFromList.append(temp)
         for i, j in enumerate(OffTo_textboxes):
-            OffToList.append(j.text())
+            temp = j.text()
+            temp = temp.replace(' ', '')
+            temp = temp.lower()
+            OffToList.append(temp)
         for i, j in enumerate(OffFrom_textboxes):
-            OffFromList.append(j.text())
+            temp = j.text()
+            temp = temp.replace(' ', '')
+            temp = temp.lower()
+            OffFromList.append(temp)
                     
         cycles_json.pop(0)
         cycles_json.append({
             "cycles": [str(cycles)],
+            "always on": [str(self.radAlwaysOn.isChecked())],
             "OnTo": OnToList,
             "OnFrom": OnFromList,
             "OffTo": OffToList,
@@ -961,12 +1067,15 @@ class CycleMenu(QMainWindow):
         OffToList.clear()
         OnFromList.clear()
         OnToList.clear()
+        alwaysOn.clear()
         
         with open(cycles_file) as file:
             cycles_json = json.load(file)
             for info in cycles_json:
                 for c in info['cycles']:
                     cycles = int(c)
+                for on in info['always on']:
+                    alwaysOn.append(on)
                 for OnTo in info['OnTo']:
                     OnToList.append(OnTo)
                 for OnFrom in info['OnFrom']:
@@ -975,19 +1084,21 @@ class CycleMenu(QMainWindow):
                     OffToList.append(OffTo)
                 for OffFrom in info['OffFrom']:
                     OffFromList.append(OffFrom)
-    def delete_cycle(self, key):
-        
     def btnAdd(self):
         global cycles, OffFromList, OffToList, OnFromList, cycles_json
         OffFromList.clear()
         OffToList.clear()
         OnFromList.clear()
         OnToList.clear()
+        alwaysOn.clear()
+        
         with open(cycles_file) as file:
             cycles_json = json.load(file)
             for info in cycles_json:
                 for c in info['cycles']:
                     cycles = int(c)
+                for on in info['always on']:
+                    alwaysOn.append(on)
                 for OnTo in info['OnTo']:
                     OnToList.append(OnTo)
                 for OnFrom in info['OnFrom']:
@@ -1004,6 +1115,7 @@ class CycleMenu(QMainWindow):
         cycles +=1
         cycles_json.append({
             "cycles": [str(cycles)],
+            "always on": [alwaysOn[0]],
             "OnTo": OnToList,
             "OnFrom": OnFromList,
             "OffTo": OffToList,
@@ -1015,11 +1127,15 @@ class CycleMenu(QMainWindow):
         OffToList.clear()
         OnFromList.clear()
         OnToList.clear()
+        alwaysOn.clear()
+        
         with open(cycles_file) as file:
             cycles_json = json.load(file)
             for info in cycles_json:
                 for c in info['cycles']:
                     cycles = int(c)
+                for on in info['always on']:
+                    alwaysOn.append(on)
                 for OnTo in info['OnTo']:
                     OnToList.append(OnTo)
                 for OnFrom in info['OnFrom']:
@@ -1030,6 +1146,26 @@ class CycleMenu(QMainWindow):
                     OffFromList.append(OffFrom)
         self.clearLayout(self.grid)
         self.grid.addWidget(self.lay(), 1, 0)
+    def submit(self):
+        global cycles, OffFromList, OffToList, OnFromList, onToList, cycles_json, all_textboxes
+        for i, j in enumerate(all_textboxes):
+            temp = j.text()
+            temp = temp.replace(' ', '')
+            temp = temp.lower()
+            print(temp)
+            rx = re.compile(r"[0,1][0-9][:][0-5][0-9][a,p][m]")
+            if not rx.match(j.text()):
+                QMessageBox.warning(self, 'Format error!', f"{j.text()}\n\nYou don't have the correct format!\n\nThe correct format should look like: 02:57am or 11:01pm.", QMessageBox.Ok, QMessageBox.Ok)
+                return
+        self.delete_save_saveCycles()
+        self.close()
+def exit_handler():
+    running = False
+    print('Exit pressed')
+    camera.end_cam()
+    camera.cap.release()
+    cv2.destroyAllWindows()
+    sys.exit()
 # class
 if __name__ == '__main__':
     atexit.register(exit_handler)

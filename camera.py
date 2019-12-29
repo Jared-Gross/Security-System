@@ -35,6 +35,9 @@ for r, d, f in os.walk(cascade_files_dir):
 settings_file = os.path.dirname(os.path.realpath(__file__)) + '/settings.json'
 settings_json = []
 
+cycles_file = os.path.dirname(os.path.realpath(__file__)) + '/cycles.json'
+cycles_json = []
+
 saved_color = []
 send_email = []
 cap_screen = []
@@ -46,6 +49,9 @@ face_detect = []
 email_delay = []
 picture_delay = []
 selected_data_index = []
+
+alwaysOnList = []
+alwaysOn = False
 
 red, green, blue = 0, 0, 0
 frame = ''
@@ -342,7 +348,7 @@ def exit_handler():
 def update_variables():
     while True:
         global TIME, EMAIL_TIME, numOfPics, captureScreen, recording, email_pictures, SMILEY_FACE, SEND_EMAIL_DELAY, START_TIME, cascade, faceDetection
-        global saved_color, send_email, cap_screen, record_video, smiley_face, dark_mode, email_delay, picture_delay, saved_color, settings_json, selected_data_index, red, green, blue, face_detect
+        global saved_color, alwaysOnList, alwaysOn, send_email, cap_screen, record_video, smiley_face, dark_mode, email_delay, picture_delay, saved_color, settings_json, selected_data_index, red, green, blue, face_detect
         saved_color.clear()
         send_email.clear()
         cap_screen.clear()
@@ -353,6 +359,7 @@ def update_variables():
         picture_delay.clear()
         selected_data_index.clear()
         face_detect.clear()
+        alwaysOnList.clear()
         with open(settings_file) as file:
             settings_json = json.load(file)
             for info in settings_json:
@@ -376,6 +383,13 @@ def update_variables():
                     selected_data_index.append(ind)
                 for face in info['face detect']:
                     face_detect.append(face)
+            with open(cycles_file) as file:
+                cycles_json = json.load(file)
+                for info in cycles_json:
+                    for on in info['always on']:
+                        alwaysOnList.append(on)
+            alwaysOn = (True if alwaysOnList[0] == "True" else False)
+            print(alwaysOn)
             START_TIME = int(picture_delay[0])
             SEND_EMAIL_DELAY = int(email_delay[0])
             SMILEY_FACE = (True if smiley_face[0] == 'True' else False)

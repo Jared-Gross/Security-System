@@ -1,14 +1,18 @@
 #!/usr/bin/env python3
+import sys, os, shutil, json, multiprocessing, cv2, atexit, threading, re, time, imutils, argparse
+from imutils.video import VideoStream
+from os.path import isfile, join
+from functools import partial
+from datetime import datetime
+from os import listdir
+from flask import Response, render_template, Flask, g, request
+
 from PyQt5.QtMultimediaWidgets import *
 from PyQt5.QtMultimedia import *
 from PyQt5.QtWidgets import *
 from PyQt5.QtCore import *
 from PyQt5.QtGui import *
 from PyQt5 import *
-import sys, os, shutil, json, multiprocessing, cv2, atexit, threading, re, time
-from functools import partial
-from os import listdir
-from os.path import isfile, join
 
 # sudo python3 -m pip install --trusted-host pypi.python.org --trusted-host files.pythonhosted.org --trusted-host pypi.org [NAME]
 
@@ -35,7 +39,10 @@ email_delay = []
 picture_delay = []
 selected_data_index = []
 button_css = ''
-frame = ''
+frame = None
+ret = None
+
+outputFrame = None
 
 cycles_file = os.path.dirname(os.path.realpath(__file__)) + '/cycles.json'
 cycles_json = []
@@ -49,6 +56,15 @@ alwaysOn = []
 running = True
 
 framesPerSecond = 0
+lock = threading.Lock()
+appWeb = Flask(__name__)
+host="127.0.0.1"
+port="5000"
+time.sleep(2.0)
+
+@appWeb.route("/")
+def index():
+	return render_template("index.html")
 class MainMenu(QMainWindow):
     def __init__(self, parent = None):
         super(MainMenu, self).__init__(parent)
@@ -74,10 +90,6 @@ class MainMenu(QMainWindow):
         lay.addLayout(bottom)
         mainlay.setLayout(lay)
         self.setCentralWidget(mainlay)
-        
-        # cap = cv2.VideoCapture(0)
-        # if camera.cap is None or not cap.isOpened():
-        #     QMessageBox.critical(self, 'Camera Error!', 'Can\'t find a camera, or camera is already running in an other program.', QMessageBox.Ok, QMessageBox.Ok)
         th = Thread(self)
         th.changePixmap.connect(self.setImage)
         camera.start_cam()
@@ -584,7 +596,7 @@ class MainMenu(QMainWindow):
         if name == "Dark mode" or name == 'Light mode':
             if b.isChecked() == True:
                 b.setText('Dark mode')
-                app.setStyle("Fusion")
+                # app.setStyle("Fusion")
                 palette = QPalette()
                 gradient = QLinearGradient(0, 0, 0, 400)
                 gradient.setColorAt(0.0, QColor(40, 40, 40))
@@ -621,7 +633,7 @@ class MainMenu(QMainWindow):
                     json.dump(settings_json, file, ensure_ascii=True, indent=4, sort_keys=False)
             else:
                 b.setText('Light mode')
-                app.setStyle("Fusion")
+                # app.setStyle("Fusion")
                 app.setPalette(QApplication.style().standardPalette())
                 palette = QPalette()
                 gradient = QLinearGradient(0, 0, 0, 400)
@@ -756,8 +768,10 @@ class Thread(QThread):
             counter = 0
             n = 0
             while running:
+                global outputFrame, ret
                 try:
                     if running: ret, frame = camera.camRun()
+                    # outputFrame = frame
                 except:
                     n += 1
                     if n >= 2:
@@ -767,18 +781,37 @@ class Thread(QThread):
                     h, w, ch = rgbImage.shape
                     bytesPerLine = ch * w
                     convertToQtFormat = QImage(rgbImage.data, w, h, bytesPerLine, QImage.Format_RGB888)
-                    p = convertToQtFormat.scaled(640, 480, Qt.KeepAspectRatio)
-                    self.changePixmap.emit(p)
+                    self.changePixmap.emit(convertToQtFormat)
                 counter+=1
                 if (time.time() - start_time) > x :
                     global framesPerSecond
                     framesPerSecond = counter / (time.time() - start_time)
                     counter = 0
                     start_time = time.time()
+                
+                with lock:
+                    outputFrame = frame.copy()
+                    outputFrame = imutils.resize(outputFrame, width=200)
     except:
         running = False
     finally:
         running = False
+
+def generate():
+    global outputFrame, lock, frame
+    while running:
+        with lock:
+            if outputFrame is None:
+                continue
+            (flag, encodedImage) = cv2.imencode(".jpg", outputFrame)
+            if not flag:
+                continue
+            yield(b'--frame\r\n' b'Content-Type: image/jpeg\r\n\r\n' + bytearray(encodedImage) + b'\r\n')
+@appWeb.route("/video_feed")
+def video_feed():
+	return Response(generate(),
+		mimetype = "multipart/x-mixed-replace; boundary=frame")
+
 class CycleMenu(QMainWindow):
     def __init__(self, parent = None):
         global cycles, alwaysOn, OffFromList, OffToList, OnToList, OnFromList
@@ -842,6 +875,7 @@ class CycleMenu(QMainWindow):
                         OffFromList.append(OffFrom)
         # regexp = QtCore.QRegExp('[0,1][0-9][:][0-5][0-9][a,p][m]')
         regexp = QtCore.QRegExp('[a-z-A-Z-0-9-:_]{0,7}')
+        # regexp = QtCore.QRegExp("\A(?:[1-2]{2}|[1-9])[:][0-5][0-9][a,p,A,P][m,M]\Z")
         self.validator = QtGui.QRegExpValidator(regexp)
         super(CycleMenu, self).__init__(parent)
         self.setWindowTitle('J-Detection - Cycle Menu')
@@ -890,9 +924,9 @@ class CycleMenu(QMainWindow):
         self.radAlwaysOn.clicked.connect(self.delete_save_saveCycles)
         self.radAlwaysOn.setChecked(True if alwaysOn[0] == 'True' else False)
         grid.addWidget(self.radAlwaysOn, 0, 0) 
-        addCycle = QPushButton('+')
+        addCycle = QPushButton('&Add')
         addCycle.clicked.connect(self.btnAdd)
-        btnSubmit = QPushButton()
+        btnSubmit = QPushButton('&Submit')
         btnSubmit.clicked.connect(self.save_cycles)
         btnSubmit.setIcon(self.style().standardIcon(getattr(QStyle, 'SP_DialogApplyButton')))
         btnSubmit.clicked.connect(self.submit)
@@ -914,11 +948,11 @@ class CycleMenu(QMainWindow):
             btnDown.clicked.connect(partial(self.down_arrow, i))
             btnDown.setIcon(self.style().standardIcon(getattr(QStyle, 'SP_ArrowDown')))
             
-            OnFrom = QLineEdit(self.currentTime)
-            OnTo = QLineEdit(self.currentTime)
+            OnFrom = QLineEdit()
+            OnTo = QLineEdit()
             
-            OffFrom = QLineEdit(self.currentTime)
-            OffTo = QLineEdit(self.currentTime)
+            OffFrom = QLineEdit()
+            OffTo = QLineEdit()
             
             # OnFrom = QComboBox()
             # OnTo = QComboBox()
@@ -1004,7 +1038,7 @@ class CycleMenu(QMainWindow):
             temp = j.text()
             temp = temp.replace(' ', '')
             temp = temp.lower()
-            rx = re.compile(r"[0,1][0-9][:][0-5][0-9][a,p][m]")
+            rx = re.compile(r"\A(?:[0-2]{2}|[1-9])[:][0-5][0-9][a,p,A,P][m,M]\Z")
             if not rx.match(temp):
                 return
         self.delete_save_saveCycles()
@@ -1033,22 +1067,22 @@ class CycleMenu(QMainWindow):
         for i, j in enumerate(OnTo_textboxes):
             temp = j.text()
             temp = temp.replace(' ', '')
-            temp = temp.lower()
+            temp = temp.upper()
             OnToList.append(temp)
         for i, j in enumerate(OnFrom_textboxes):
             temp = j.text()
             temp = temp.replace(' ', '')
-            temp = temp.lower()
+            temp = temp.upper()
             OnFromList.append(temp)
         for i, j in enumerate(OffTo_textboxes):
             temp = j.text()
             temp = temp.replace(' ', '')
-            temp = temp.lower()
+            temp = temp.upper()
             OffToList.append(temp)
         for i, j in enumerate(OffFrom_textboxes):
             temp = j.text()
             temp = temp.replace(' ', '')
-            temp = temp.lower()
+            temp = temp.upper()
             OffFromList.append(temp)
                     
         cycles_json.pop(0)
@@ -1153,9 +1187,9 @@ class CycleMenu(QMainWindow):
             temp = temp.replace(' ', '')
             temp = temp.lower()
             print(temp)
-            rx = re.compile(r"[0,1][0-9][:][0-5][0-9][a,p][m]")
+            rx = re.compile(r"\A(?:[0-2]{2}|[1-9])[:][0-5][0-9][a,p,A,P][m,M]\Z")
             if not rx.match(j.text()):
-                QMessageBox.warning(self, 'Format error!', f"{j.text()}\n\nYou don't have the correct format!\n\nThe correct format should look like: 02:57am or 11:01pm.", QMessageBox.Ok, QMessageBox.Ok)
+                QMessageBox.warning(self, 'Format error!', f"\"{j.text()}\" is incorrect\n\nYou don't have the correct format!\n\nThe correct format should look like:\n2:57am or 11:01pm.", QMessageBox.Ok, QMessageBox.Ok)
                 return
         self.delete_save_saveCycles()
         self.close()
@@ -1166,9 +1200,19 @@ def exit_handler():
     camera.cap.release()
     cv2.destroyAllWindows()
     sys.exit()
+def start_server():
+    appWeb.run(host=host, port=port, debug=True, threaded=True, use_reloader=False)
+    threading.Thread(target=generate).start()
 # class
 if __name__ == '__main__':
     atexit.register(exit_handler)
+    # construct the argument parser and parse command line arguments
+    # ap = argparse.ArgumentParser()
+    # ap.add_argument("-i", "--ip", type=str, required=True,default="0.0.0.0", help="ip address of the device")
+    # ap.add_argument("-o", "--port", type=int, required=True, default="8000", help="ephemeral port number of the server (1024 to 65535)")
+    # ap.add_argument("-f", "--frame-count", type=int, default=32, help="# of frames used to construct the background model")
+    # args = vars(ap.parse_args())
+
     if not os.path.exists('Pics'):
         os.mkdir('Pics')
     if os.path.exists(settings_file):
@@ -1245,7 +1289,7 @@ if __name__ == '__main__':
     button_css = 'background-color: rgb(' + str(saved_color[0]) + ', ' + str(saved_color[1]) + ', ' + str(saved_color[2]) + ')'
 
     app = QApplication(sys.argv)
-    app.setStyle("Fusion")
+    # app.setStyle("Fusion")
     if dark_mode[0] == 'True':
         palette = QPalette()
         gradient = QLinearGradient(0, 0, 0, 400)
@@ -1274,8 +1318,7 @@ if __name__ == '__main__':
         palette.setColor(QPalette.ButtonText, Qt.black)
         palette.setBrush(QPalette.Window, QBrush(gradient))
         app.setPalette(palette)
+    threading.Thread(target=start_server).start()
     main = MainMenu()
     main.show()
-    # START_CAMERA = multiprocessing.Process(target=MainMenu)
     sys.exit(app.exec_())
-    # START_CAMERA.start()

@@ -35,9 +35,6 @@ for r, d, f in os.walk(cascade_files_dir):
 settings_file = os.path.dirname(os.path.realpath(__file__)) + '/settings.json'
 settings_json = []
 
-cycles_file = os.path.dirname(os.path.realpath(__file__)) + '/cycles.json'
-cycles_json = []
-
 saved_color = []
 send_email = []
 cap_screen = []
@@ -50,8 +47,23 @@ email_delay = []
 picture_delay = []
 selected_data_index = []
 
+cycles_file = os.path.dirname(os.path.realpath(__file__)) + '/cycles.json'
+cycles_json = []
+
+OnToList = []
+OnFromList = []
+OffToList = []
+OffFromList = []
 alwaysOnList = []
+cycles = []
+
 alwaysOn = False
+timeToSend = False
+currentTime = ''
+lastCurrentTime = ''
+currentTimeDay = ''
+currentTimeHour = 0
+currentTimeMinute = 0
 
 red, green, blue = 0, 0, 0
 frame = ''
@@ -59,7 +71,7 @@ image_folder = 'Pics'
 video_name = os.path.dirname(os.path.realpath(__file__)) + '/temp.avi'
 numOfPics = 0
 cascade = cv2.CascadeClassifier(cascade_files[0])
-cap = cv2.VideoCapture(0)
+cap = cv2.VideoCapture(1)
 frame = []
 ret = []
 firstFrame = None
@@ -206,7 +218,7 @@ def btnStop():
         # When everything done, release the capture
         clip = mp.VideoFileClip(video_name)
         # make the height 360px ( According to moviePy documenation The width is then computed so that the width/height ratio is conserved.)
-        clip_resized = clip.resize(height=360)
+        clip_resized = clip.resize(height=260)
         clip_resized.write_videofile(os.path.dirname(os.path.realpath(__file__)) + "/output.mp4")
         os.remove(video_name)
         print("Deleted: {0}".format(video_name))
@@ -347,7 +359,7 @@ def exit_handler():
     btnStop()
 def update_variables():
     while True:
-        global TIME, EMAIL_TIME, numOfPics, captureScreen, recording, email_pictures, SMILEY_FACE, SEND_EMAIL_DELAY, START_TIME, cascade, faceDetection
+        global TIME, EMAIL_TIME, currentTime, lastCurrentTime, numOfPics, captureScreen, recording, email_pictures, SMILEY_FACE, SEND_EMAIL_DELAY, START_TIME, cascade, faceDetection
         global saved_color, alwaysOnList, alwaysOn, send_email, cap_screen, record_video, smiley_face, dark_mode, email_delay, picture_delay, saved_color, settings_json, selected_data_index, red, green, blue, face_detect
         saved_color.clear()
         send_email.clear()
@@ -389,7 +401,10 @@ def update_variables():
                     for on in info['always on']:
                         alwaysOnList.append(on)
             alwaysOn = (True if alwaysOnList[0] == "True" else False)
-            print(alwaysOn)
+            currentTime = str(datetime.now().strftime("%I:%M%p"))
+            if not currentTime in lastCurrentTime:
+                lastCurrentTime = currentTime
+                isTimeToSend()
             START_TIME = int(picture_delay[0])
             SEND_EMAIL_DELAY = int(email_delay[0])
             SMILEY_FACE = (True if smiley_face[0] == 'True' else False)
@@ -399,7 +414,78 @@ def update_variables():
             faceDetection = (True if face_detect[0] == 'True' else False)
             cascade = cv2.CascadeClassifier(cascade_files[int(selected_data_index[0])])
             red, green, blue = int(saved_color[2]), int(saved_color[1]), int(saved_color[0])
-            time.sleep(1)
+        time.sleep(1)
+def isTimeToSend():
+    global timeToSend, cycles, OnToList, OnFromList, OffToList, OffFromList
+    OnToList.clear()
+    OnFromList.clear()
+    OffToList.clear()
+    OffFromList.clear()
+    # currentTime = '09:10AM'
+    print(list(currentTime))
+    if list(currentTime[3]) == ['0']: currentTimeMinute = list(currentTime[4])
+    elif not list(currentTime[3]) == ['0']: currentTimeMinute = list(currentTime[3]) + list(currentTime[4])
+    
+    if list(currentTime[0]) == ['0']: currentTimeHour = list(currentTime[1])
+    elif not list(currentTime[0]) == ['0']: currentTimeHour = list(currentTime[0]) + list(currentTime[1])
+    
+    currentTimeHour = "".join(currentTimeHour)
+    currentTimeMinute = "".join(currentTimeMinute)
+    
+    currentTimeDay = list(currentTime[-2])
+    currentTimeDay = "".join(currentTimeDay)
+    
+    with open(cycles_file) as file:
+        cycles_json = json.load(file)
+        for info in cycles_json:
+            for c in info['cycles']:
+                cycles = int(c)
+            for OnTo in info['OnTo']:
+                OnToList.append(OnTo)
+            for OnFrom in info['OnFrom']:
+                OnFromList.append(OnFrom)
+            for OffTo in info['OffTo']:
+                OffToList.append(OffTo)
+            for OffFrom in info['OffFrom']:
+                OffFromList.append(OffFrom)
+    if not alwaysOn:
+        for i in range(cycles):
+            if OnToList[i][1] == ':': OnToNumHour = OnToList[i][0]
+            else: OnToNumHour = str(OnToList[i][0] + OnToList[i][1])
+            if OnFromList[i][1] == ':': OnFromNumHour = (OnFromList[i][0])
+            else: OnFromNumHour = str(OnFromList[i][0] + OnFromList[i][1])
+                
+            OnToNumHour = "".join(OnToNumHour)
+            OnFromNumHour = "".join(OnFromNumHour)
+            
+            if OffToList[i][1] == ':': OffToNumHour = OffToList[i][0]
+            else: OffToNumHour = str(OffToList[i][0] + OffToList[i][1])
+            if OffFromList[i][1] == ':': OffFromNumHour = (OffFromList[i][0])
+            else: OffFromNumHour = str(OffFromList[i][0] + OffFromList[i][1])
+                
+            OffToNumHour = "".join(OffToNumHour)
+            OffFromNumHour = "".join(OffFromNumHour)
+            if int(OnToNumHour) <= int(currentTimeHour) and int(OnFromNumHour) >= int(currentTimeHour) and currentTimeDay == OnToList[i][-2] or currentTimeDay == OnFromList[i][-2]:
+                print ('On: ' + OnToNumHour + ' <= ' + str(currentTimeHour) + ' and ' + str(OnFromNumHour) + ' >= ' + currentTimeHour)
+                # print(str(i) + ' On To: ' + OnToList[i])
+                # print(str(i) + ' On From: ' + OnFromList[i])
+                timeToSend = True
+                print(timeToSend)
+            if int(OffToNumHour) <= int(currentTimeHour) and int(OffFromNumHour) >= int(currentTimeHour) and currentTimeDay == OffToList[i][-2] or currentTimeDay == OffFromList[i][-2]:
+                print ('Off: ' + OffToNumHour + ' <= ' + str(currentTimeHour) + ' and ' + str(OnFromNumHour) + ' >= ' + currentTimeHour)
+                # print(str(i) + ' Off To: ' + OffToList[i])
+                # print(str(i) + ' Off From: ' + OffFromList[i])
+                timeToSend = False
+                print(timeToSend)
+            # if OffToList[i][0] >= currentTimeHour and OffFromList[i][0] <= currentTimeHour and currentTimeDay == OffToList[i][-2] or currentTimeDay == OffFromList[i][-2]:
+            #     timeToSend = False
+            # else: timeToSend = True
+        return
+    else:
+        timeToSend = True
+        print(timeToSend)
+        return
+    
 def start_cam():
     global isRunning
     isRunning = True

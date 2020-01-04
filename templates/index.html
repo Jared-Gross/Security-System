@@ -1,17 +1,52 @@
 <html>
   <head>
+    <style>
+      h1 {
+        color: blue;
+        text-align: center;
+        font-family: courier;
+        font-size: 300%;
+        margin: 0 auto; 
+      }
+      p  {
+        color: red;
+        font-family: courier;
+        font-size: 160%;
+      }
+      #wrap { 
+        width: 900px; 
+        margin: 0 auto; 
+      }
+      #bg {
+        -webkit-background-size: cover;
+        -moz-background-size: cover;
+        -o-background-size: cover;
+        background-size: cover;
+      }
+      #frame {
+        position: absolute;
+        top: 40%;
+        left: 50%;
+        transform: translate(-50%, -50%);
+      }
+      #clock {
+        position: absolute;
+        top: 70%;
+        left: 50%;
+        transform: translate(-50%, -50%);
+      }
+    </style>
     <title>
       Video Surveillance
     </title>
   </head>
-  <body>
-    <h1>
-      Video Surveillance
-    </h1>
-      <div>
-        <img src="{{ url_for('video_feed') }}">
-      </div>
-    <iframe 
-      src="http://free.timeanddate.com/clock/i73ffl7s/n265/tt0/tw0/tm1/tb4" frameborder="1" width="150" height="34">
-    </iframe>
-  </html>
+  <body background="https://www.raspberrypi.org/app/uploads/2011/10/Raspi-PGB001.png" id="bg">
+    <div>
+      <h1>
+        Video Surveillance
+      </h1>
+      <img src="{{ url_for('video_feed') }}" alt="video feed" id="frame" width="640" height="480">
+      <iframe src="http://free.timeanddate.com/clock/i73ffl7s/n265/tt0/tw0/tm1/tb4" id="clock" frameborder="0" width="100" height="34">
+    </div>
+  </body>
+</html>

@@ -4,9 +4,9 @@ from imutils.video import VideoStream
 from os.path import isfile, join
 from functools import partial
 from datetime import datetime
+from natsort import natsorted
 from os import listdir
 from flask import Response, render_template, Flask, g, request
-
 from PyQt5.QtMultimediaWidgets import *
 from PyQt5.QtMultimedia import *
 from PyQt5.QtWidgets import *
@@ -23,6 +23,7 @@ settings_json = []
 
 cascade_files_dir = os.path.dirname(os.path.realpath(__file__)) + '/Data Models'
 cascade_files = [f for f in listdir(cascade_files_dir) if isfile(join(cascade_files_dir, f))]
+cascade_files = natsorted(cascade_files)
 isActive = False
 
 saved_color = []
@@ -170,10 +171,10 @@ class MainMenu(QMainWindow):
         recordvideo.triggered.connect(partial(self.checkboxClicked, recordvideo, 'Record Video'))
         recordvideo.setStatusTip('Record footage of the webcam.')
         
-        captureScreen = QAction('Record Screen', self, checkable=True)
+        captureScreen = QAction('Capture Screen', self, checkable=True)
         captureScreen.setChecked(True if cap_screen[0] == 'True' else False)
         captureScreen.triggered.connect(partial(self.checkboxClicked, captureScreen, 'Capture Screen'))
-        captureScreen.setStatusTip('Record footage of the screen.')
+        captureScreen.setStatusTip('Take screenshot of main moniter instead of webcam.')
         
         sendEmails = QAction('Send Emails', self, checkable=True)
         sendEmails.setChecked(True if send_email[0] == 'True' else False)
@@ -196,7 +197,7 @@ class MainMenu(QMainWindow):
         settingsMenu.addAction(self.colorMenu)
         settingsMenu.addAction(self.cycleMenu)
         # settingsMenu.addAction(recordvideo)
-        # settingsMenu.addAction(captureScreen)
+        settingsMenu.addAction(captureScreen)
         settingsMenu.addAction(sendEmails)
         settingsMenu.addAction(smileyFace)
         settingsMenu.addAction(self.faceDetection)
@@ -575,6 +576,8 @@ class MainMenu(QMainWindow):
                 })
                 with open(settings_file, mode='w+', encoding='utf-8') as file:
                     json.dump(settings_json, file, ensure_ascii=True, indent=4, sort_keys=False)
+                if email_address[0] == '':
+                    self.verifyEmailAddress('@gmail.com')
             else:
                 settings_json.pop(0)
                 settings_json.append({
@@ -917,59 +920,21 @@ class CycleMenu(QMainWindow):
         OnFromList.clear()
         OnToList.clear()
         alwaysOn.clear()
-        if os.path.exists(cycles_file):
-            with open(cycles_file) as file:
-                cycles_json = json.load(file)
-                for info in cycles_json:
-                    for c in info['cycles']:
-                        cycles = int(c)
-                    for on in info['always on']:
-                        alwaysOn.append(on)
-                    for OnTo in info['OnTo']:
-                        OnToList.append(OnTo)
-                    for OnFrom in info['OnFrom']:
-                        OnFromList.append(OnFrom)
-                    for OffTo in info['OffTo']:
-                        OffToList.append(OffTo)
-                    for OffFrom in info['OffFrom']:
-                        OffFromList.append(OffFrom)
-        elif not os.path.exists(cycles_file):
-            file = open(cycles_file, "w+")
-            file.write('''[{
-        "cycles": [
-            "1"
-        ],
-        "always on":[
-            "False"
-        ],
-        "OnTo": [
-            "0:00AM"
-        ],
-        "OnFrom": [
-            "0:00AM"
-        ],
-        "OffTo": [
-            "0:00AM"
-        ],
-        "OffFrom": [
-            "0:00AM"
-        ]}]''')
-            file.close()
-            with open(cycles_file) as file:
-                cycles_json = json.load(file)
-                for info in cycles_json:
-                    for c in info['cycles']:
-                        cycles = int(c)
-                    for on in info['always on']:
-                        alwaysOn.append(on)
-                    for OnTo in info['OnTo']:
-                        OnToList.append(OnTo)
-                    for OnFrom in info['OnFrom']:
-                        OnFromList.append(OnFrom)
-                    for OffTo in info['OffTo']:
-                        OffToList.append(OffTo)
-                    for OffFrom in info['OffFrom']:
-                        OffFromList.append(OffFrom)
+        with open(cycles_file) as file:
+            cycles_json = json.load(file)
+            for info in cycles_json:
+                for c in info['cycles']:
+                    cycles = int(c)
+                for on in info['always on']:
+                    alwaysOn.append(on)
+                for OnTo in info['OnTo']:
+                    OnToList.append(OnTo)
+                for OnFrom in info['OnFrom']:
+                    OnFromList.append(OnFrom)
+                for OffTo in info['OffTo']:
+                    OffToList.append(OffTo)
+                for OffFrom in info['OffFrom']:
+                    OffFromList.append(OffFrom)
         # regexp = QtCore.QRegExp('[0,1][0-9][:][0-5][0-9][a,p][m]')
         regexp = QtCore.QRegExp('[a-z-A-Z-0-9-:_]{0,7}')
         # regexp = QtCore.QRegExp("\A(?:[1-2]{2}|[1-9])[:][0-5][0-9][a,p,A,P][m,M]\Z")
@@ -1135,7 +1100,7 @@ class CycleMenu(QMainWindow):
             temp = j.text()
             temp = temp.replace(' ', '')
             temp = temp.lower()
-            rx = re.compile(r"\A(?:[0-2]{2}|[1-9])[:][0-5][0-9][a,p,A,P][m,M]\Z")
+            rx = re.compile(r"^((2[0-3]|[01][1-9]|10):([0-5][0-9]))$")
             if not rx.match(temp):
                 return
         self.delete_save_saveCycles()
@@ -1239,10 +1204,10 @@ class CycleMenu(QMainWindow):
                 for OffFrom in info['OffFrom']:
                     OffFromList.append(OffFrom)
         cycles_json.pop(0)
-        OnToList.append('')
-        OnFromList.append('')
-        OffToList.append('')
-        OffFromList.append('')
+        OnToList.append('00:00')
+        OnFromList.append('00:00')
+        OffToList.append('00:00')
+        OffFromList.append('00:00')
         cycles +=1
         cycles_json.append({
             "cycles": [str(cycles)],
@@ -1284,9 +1249,9 @@ class CycleMenu(QMainWindow):
             temp = temp.replace(' ', '')
             temp = temp.lower()
             print(temp)
-            rx = re.compile(r"\A(?:[0-2]{2}|[1-9])[:][0-5][0-9][a,p,A,P][m,M]\Z")
+            rx = re.compile(r"^((2[0-3]|[01][1-9]|10):([0-5][0-9]))$")
             if not rx.match(j.text()):
-                QMessageBox.warning(self, 'Format error!', f"\"{j.text()}\" is incorrect\n\nYou don't have the correct format!\n\nThe correct format should look like:\n2:57am or 11:01pm.", QMessageBox.Ok, QMessageBox.Ok)
+                QMessageBox.warning(self, 'Format error!', f"\"{j.text()}\" is incorrect\n\nYou don't have the correct format!\n\nThe correct format should look like:\n02:57 or 23:01.", QMessageBox.Ok, QMessageBox.Ok)
                 return
         self.delete_save_saveCycles()
         self.close()
@@ -1312,6 +1277,59 @@ if __name__ == '__main__':
 
     if not os.path.exists('Pics'):
         os.mkdir('Pics')
+    if os.path.exists(cycles_file):
+        with open(cycles_file) as file:
+            cycles_json = json.load(file)
+            for info in cycles_json:
+                for c in info['cycles']:
+                    cycles = int(c)
+                for on in info['always on']:
+                    alwaysOn.append(on)
+                for OnTo in info['OnTo']:
+                    OnToList.append(OnTo)
+                for OnFrom in info['OnFrom']:
+                    OnFromList.append(OnFrom)
+                for OffTo in info['OffTo']:
+                    OffToList.append(OffTo)
+                for OffFrom in info['OffFrom']:
+                    OffFromList.append(OffFrom)
+    elif not os.path.exists(cycles_file):
+        file = open(cycles_file, "w+")
+        file.write('''[{
+    "cycles": [
+        "1"
+    ],
+    "always on":[
+        "False"
+    ],
+    "OnTo": [
+        "00:00"
+    ],
+    "OnFrom": [
+        "00:00"
+    ],
+    "OffTo": [
+        "00:00"
+    ],
+    "OffFrom": [
+        "00:00"
+    ]}]''')
+        file.close()
+        with open(cycles_file) as file:
+            cycles_json = json.load(file)
+            for info in cycles_json:
+                for c in info['cycles']:
+                    cycles = int(c)
+                for on in info['always on']:
+                    alwaysOn.append(on)
+                for OnTo in info['OnTo']:
+                    OnToList.append(OnTo)
+                for OnFrom in info['OnFrom']:
+                    OnFromList.append(OnFrom)
+                for OffTo in info['OffTo']:
+                    OffToList.append(OffTo)
+                for OffFrom in info['OffFrom']:
+                    OffFromList.append(OffFrom)
     if os.path.exists(settings_file):
         with open(settings_file) as file:
             settings_json = json.load(file)

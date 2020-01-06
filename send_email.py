@@ -37,7 +37,7 @@ def email_picture(name, text):
     msgAlternative = MIMEMultipart('alternative')
     msgRoot.attach(msgAlternative)
     # We reference the image in the IMG SRC attribute by the ID we give it below
-    msgText = MIMEText(f'{text}\n\n{datetime.now()}\n<br><img src="cid:image1"><img src="cid:image2"><br>', 'html')
+    msgText = MIMEText(f'{text}\n\n{datetime.now()}\n<br><img src="cid:image1"><img src="cid:image2"><br> <a href=\"http://127.0.0.1:5000\">Watch Live</a>', 'html')
     msgAlternative.attach(msgText)
 
     # Define the image's ID as referenced above

@@ -31,7 +31,7 @@ for r, d, f in os.walk(cascade_files_dir):
     for file in f:
         if '.xml' in file:
             cascade_files.append(os.path.join(r, file))
-
+print(cascade_files)
 settings_file = os.path.dirname(os.path.realpath(__file__)) + '/settings.json'
 settings_json = []
 
@@ -234,8 +234,11 @@ def camRun():
     isRunning = True
     # cap = cv2.VideoCapture(0)
     # print("Starting..")
-    eye_cascade = cv2.CascadeClassifier(cascade_files[0])
-    mouth_cascade = cv2.CascadeClassifier(cascade_files[17])
+    for i, j in enumerate(cascade_files):
+        if j == '/home/jared/Documents/Github Clones/Security-System/Data Models/haarcascade_eye.xml':
+            eye_cascade = cv2.CascadeClassifier(cascade_files[i])
+        if j == '/home/jared/Documents/Github Clones/Security-System/Data Models/haarcascade_smile.xml':
+            mouth_cascade = cv2.CascadeClassifier(cascade_files[i])
     eyes = []
     mouth = []
     # construct the argument parser and parse the arguments
@@ -289,7 +292,7 @@ def camRun():
             if TIME >= 0 and recording:
                 numOfPics += 1
                 savePicture(numOfPics)
-            if EMAIL_TIME >= SEND_EMAIL_DELAY and len(faces) >= 1 and not recording and email_pictures:
+            if EMAIL_TIME >= SEND_EMAIL_DELAY and len(faces) >= 1 and not recording and email_pictures and timeToSend:
                 numOfPics += 1
                 EMAIL_TIME = 0
                 print(f'Found {len(faces)} faces! Pictures taken: {numOfPics}')
@@ -329,7 +332,7 @@ def camRun():
             if TIME >= 0 and recording:
                 numOfPics += 1
                 savePicture(numOfPics)
-            if EMAIL_TIME >= SEND_EMAIL_DELAY and len(cnts) >= 1 and not recording and email_pictures:
+            if EMAIL_TIME >= SEND_EMAIL_DELAY and len(cnts) >= 1 and not recording and email_pictures and timeToSend:
                 numOfPics += 1
                 EMAIL_TIME = 0
                 print(f'Found {len(cnts)} faces! Pictures taken: {numOfPics}')
@@ -422,7 +425,7 @@ def isTimeToSend():
     OnFromList.clear()
     OffToList.clear()
     OffFromList.clear()
-    # currentTime = '09:10AM'
+    # currentTime = '03:17PM'
     print(list(currentTime))
     if list(currentTime[3]) == ['0']: currentTimeMinute = list(currentTime[4])
     elif not list(currentTime[3]) == ['0']: currentTimeMinute = list(currentTime[3]) + list(currentTime[4])
@@ -430,12 +433,16 @@ def isTimeToSend():
     if list(currentTime[0]) == ['0']: currentTimeHour = list(currentTime[1])
     elif not list(currentTime[0]) == ['0']: currentTimeHour = list(currentTime[0]) + list(currentTime[1])
     
-    currentTimeHour = "".join(currentTimeHour)
-    currentTimeMinute = "".join(currentTimeMinute)
-    
     currentTimeDay = list(currentTime[-2])
     currentTimeDay = "".join(currentTimeDay)
     
+    currentTimeHour = "".join(currentTimeHour)
+    if currentTimeDay == 'P':
+        currentTimeHour = int(currentTimeHour)
+        currentTimeHour += 12
+    currentTimeMinute = "".join(currentTimeMinute)
+    
+    print("currentTimeHour: " + str(currentTimeHour) + ':' + str(currentTimeMinute))
     with open(cycles_file) as file:
         cycles_json = json.load(file)
         for info in cycles_json:
@@ -451,36 +458,63 @@ def isTimeToSend():
                 OffFromList.append(OffFrom)
     if not alwaysOn:
         for i in range(cycles):
-            if OnToList[i][1] == ':': OnToNumHour = OnToList[i][0]
+            
+            if OnToList[i][0] == '0': OnToNumHour = OnToList[i][1]
             else: OnToNumHour = str(OnToList[i][0] + OnToList[i][1])
-            if OnFromList[i][1] == ':': OnFromNumHour = (OnFromList[i][0])
+            if OnFromList[i][0] == '0': OnFromNumHour = (OnFromList[i][1])
             else: OnFromNumHour = str(OnFromList[i][0] + OnFromList[i][1])
-                
             OnToNumHour = "".join(OnToNumHour)
             OnFromNumHour = "".join(OnFromNumHour)
             
-            if OffToList[i][1] == ':': OffToNumHour = OffToList[i][0]
+            if OnToList[i][3] == '0': OnToNumMinute = OnToList[i][4]
+            else: OnToNumMinute = str(OnToList[i][3] + OnToList[i][4])
+            if OnFromList[i][3] == '0': OnFromNumMinute = (OnFromList[i][4])
+            else: OnFromNumMinute = str(OnFromList[i][3] + OnFromList[i][4])
+            OnToNumMinute = "".join(OnToNumMinute)
+            OnFromNumMinute = "".join(OnFromNumMinute)
+            
+            if OffToList[i][0] == '0': OffToNumHour = OffToList[i][1]
             else: OffToNumHour = str(OffToList[i][0] + OffToList[i][1])
-            if OffFromList[i][1] == ':': OffFromNumHour = (OffFromList[i][0])
+            if OffFromList[i][0] == '0': OffFromNumHour = (OffFromList[i][1])
             else: OffFromNumHour = str(OffFromList[i][0] + OffFromList[i][1])
-                
             OffToNumHour = "".join(OffToNumHour)
             OffFromNumHour = "".join(OffFromNumHour)
-            if int(OnToNumHour) <= int(currentTimeHour) and int(OnFromNumHour) >= int(currentTimeHour) and currentTimeDay == OnToList[i][-2] or currentTimeDay == OnFromList[i][-2]:
-                print ('On: ' + OnToNumHour + ' <= ' + str(currentTimeHour) + ' and ' + str(OnFromNumHour) + ' >= ' + currentTimeHour)
-                # print(str(i) + ' On To: ' + OnToList[i])
-                # print(str(i) + ' On From: ' + OnFromList[i])
-                timeToSend = True
+
+            if OffToList[i][3] == '0': OffToNumMinute = OffToList[i][4]
+            else: OffToNumMinute = str(OffToList[i][3] + OffToList[i][4])
+            if OffFromList[i][3] == '0': OffFromNumMinute = (OffFromList[i][4])
+            else: OffFromNumMinute = str(OffFromList[i][3] + OffFromList[i][4])
+            OffToNumMinute = "".join(OffToNumMinute)
+            OffFromNumMinute = "".join(OffFromNumMinute)
+            
+            if int(OnToNumHour) <= int(currentTimeHour) and int(OnFromNumHour) >= int(currentTimeHour):
+                print ('HOUR On: OnToNumHour: ' + str(OnToNumHour) + ' <= currentTimeHour: ' + str(currentTimeHour) + ' and OnFromNumHour: ' + str(OnFromNumHour) + ' >= currentTimeHour: ' + str(currentTimeHour))
+                if int(OnToNumMinute) <= int(currentTimeMinute):
+                    timeToSend = True
+                    print ('MINUTE On: OnTo: ' + str(OnToList[i]) + ' >= ' + "currentTimeHour: " + str(currentTimeHour) + ':' + str(currentTimeMinute))
+                else:
+                    if int(OnFromNumMinute) <= int(currentTimeMinute):
+                        timeToSend = False
+                        print ('MINUTE On: OnFromNumMinute: ' + str(OnFromNumMinute) + ' <= CurrentTimeMinute: ' + str(currentTimeMinute))
+                    else:
+                        timeToSend = True
+                        print ('MINUTE On: OnFromNumMinute: ' + str(OnFromNumMinute) + ' >= CurrentTimeMinute: ' + str(currentTimeMinute))
                 print(timeToSend)
-            if int(OffToNumHour) <= int(currentTimeHour) and int(OffFromNumHour) >= int(currentTimeHour) and currentTimeDay == OffToList[i][-2] or currentTimeDay == OffFromList[i][-2]:
-                print ('Off: ' + OffToNumHour + ' <= ' + str(currentTimeHour) + ' and ' + str(OnFromNumHour) + ' >= ' + currentTimeHour)
-                # print(str(i) + ' Off To: ' + OffToList[i])
-                # print(str(i) + ' Off From: ' + OffFromList[i])
-                timeToSend = False
+                return
+            if int(OffToNumHour) <= int(currentTimeHour) and int(OffFromNumHour) >= int(currentTimeHour):
+                print ('HOUR Off: OffToNumHour: ' + str(OffToNumHour) + ' <= currentTimeHour: ' + str(currentTimeHour) + ' and OffFromNumHour: ' + str(OffFromNumHour) + ' >= currentTimeHour: ' + str(currentTimeHour))
+                if int(OffToNumMinute) <= int(currentTimeMinute):
+                    timeToSend = False
+                    print ('MINUTE Off: OffToNumMinute: ' + str(OffToNumMinute) + ' <= CurrentTimeMinute: ' + str(currentTimeMinute))
+                else:
+                    if int(OffFromNumMinute) <= int(currentTimeMinute):
+                        timeToSend = True
+                        print ('MINUTE Off: OffFromNumMinute: ' + str(OffFromNumMinute) + ' <= CurrentTimeMinute: ' + str(currentTimeMinute))
+                    else:
+                        timeToSend = False
+                        print ('MINUTE Off: OffFromNumMinute: ' + str(OffFromNumMinute) + ' >= CurrentTimeMinute: ' + str(currentTimeMinute))
                 print(timeToSend)
-            # if OffToList[i][0] >= currentTimeHour and OffFromList[i][0] <= currentTimeHour and currentTimeDay == OffToList[i][-2] or currentTimeDay == OffFromList[i][-2]:
-            #     timeToSend = False
-            # else: timeToSend = True
+                return
         return
     else:
         timeToSend = True

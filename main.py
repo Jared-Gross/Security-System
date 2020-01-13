@@ -14,7 +14,7 @@ from PyQt5.QtWidgets import *
 from PyQt5.QtCore import *
 from PyQt5.QtGui import *
 from PyQt5 import *
-# sudo python3 -m pip install --trusted-host pypi.python.org --trusted-host files.pythonhosted.org --trusted-host pypi.org [NAME]
+# sudo -H python3 -m pip install --trusted-host pypi.python.org --trusted-host files.pythonhosted.org --trusted-host pypi.org [NAME]
 
 # CAMERA SCRIPT
 import camera
@@ -28,6 +28,7 @@ isActive = False
 saved_color = []
 send_email = []
 cap_screen = []
+
 record_video = []
 smiley_face = []
 dark_mode = []
@@ -1121,12 +1122,7 @@ class MainMenu(QMainWindow):
         exit_handler()
     def visitServer(self):
         a_website = "http://" + str(ip[0]) + ":5000"
-        # Open url in a new window of the default browser, if possible
         webbrowser.open_new(a_website)
-        # Open url in a new page (“tab”) of the default browser, if possible
-        # webbrowser.open_new_tab(a_website)
-        # webbrowser.open(a_website, 1) # Equivalent to: webbrowser.open_new(a_website)
-        # webbrowser.open(a_website, 2) # Equivalent to: webbrowser.open_new_tab(a_website)
 class Thread(QThread):
     try:
         changePixmap = pyqtSignal(QImage)
@@ -1469,8 +1465,7 @@ def start_server():
     threading.Thread(target=generate).start()
 if __name__ == '__main__':
     atexit.register(exit_handler)
-    if not os.path.exists('Pics'):
-        os.mkdir('Pics')
+    if not os.path.exists('Pics'): os.mkdir('Pics')
     if not os.path.exists(cycles_file) or os.stat(settings_file).st_size == 0:
         file = open(cycles_file, "w+")
         file.write('''[{
@@ -1554,7 +1549,6 @@ if __name__ == '__main__':
             for autostart in info['server auto start']: auto_start_server.append(autostart)
             for ipaddress in info['host address']: ip.append(ipaddress)
     button_css = 'background-color: rgb(' + str(saved_color[0]) + ', ' + str(saved_color[1]) + ', ' + str(saved_color[2]) + ')'
-
     app = QApplication(sys.argv)
     if dark_mode[0] == '1':
         app.setStyle("Fusion")
@@ -1586,8 +1580,7 @@ if __name__ == '__main__':
         palette.setColor(QPalette.ButtonText, Qt.black)
         palette.setBrush(QPalette.Window, QBrush(gradient))
         app.setPalette(palette)
-    if auto_start_server[0] == "True":
-        threading.Thread(target=start_server).start()
+    if auto_start_server[0] == "True": threading.Thread(target=start_server).start()
     main = MainMenu()
     main.show()
     sys.exit(app.exec_())

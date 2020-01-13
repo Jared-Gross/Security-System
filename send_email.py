@@ -37,7 +37,7 @@ def email_picture(name, text):
     msgAlternative = MIMEMultipart('alternative')
     msgRoot.attach(msgAlternative)
     # We reference the image in the IMG SRC attribute by the ID we give it below
-    msgText = MIMEText(f'{text}\n\n{datetime.now()}\n<br><img src="cid:image1"><img src="cid:image2"><br> <a href=\"http://127.0.0.1:5000\">Watch Live</a>', 'html')
+    msgText = MIMEText(f'{text}\n\n{datetime.now()}\n<br><img src="cid:image1"><img src="cid:image2"><br>', 'html')
     msgAlternative.attach(msgText)
 
     # Define the image's ID as referenced above
@@ -63,8 +63,6 @@ def email_picture(name, text):
     for the_file in os.listdir(image_folder):
         file_path = os.path.join(image_folder, the_file)
         try:
-            if os.path.isfile(file_path):
-                os.unlink(file_path)
-        except Exception as e:
-            print(e)
+            if os.path.isfile(file_path):  os.unlink(file_path)
+        except Exception as e: print(e)
     print('Images deleted')

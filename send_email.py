@@ -16,7 +16,7 @@ def email_picture(name, text):
             for ipaddress in info['host address']: ip.append(ipaddress)
     EMAIL = 'jaredgrozz@gmail.com'
     EMAIL_TO = email_address[0].split(', ')
-    EMAIL_PASSWORD = 'ffvprugomuuywemq'#<-
+    EMAIL_PASSWORD = ''#<-
     '''                                   \
                                         \
     DO NOT USE YOUR ACTUAL GMAIL PASSWORD!! \

@@ -11,6 +11,10 @@ from datetime import datetime
 from send_email import email_picture
 from threading import Timer
 import main
+import urllib, requests
+import urllib.request
+from urllib.parse import *
+
 # captureScreen = IntVar()
 captureScreen = False
 recording = False
@@ -18,12 +22,18 @@ email_pictures = True
 faceDetection = True
 SMILEY_FACE = False
 
+is_ip_cam_on = []
+ip_cam_url = []
+ip_cam_usrname = []
+ip_cam_pswd = []
+
 canvas_height=200
 canvas_width=200
 START_TIME = 5
 SEND_EMAIL_DELAY = 10
 TIME = 0
 EMAIL_TIME = 0
+local_camera = True
 
 cascade_files_dir = os.path.dirname(os.path.realpath(__file__)) + '/Data Models'
 cascade_files = []
@@ -65,7 +75,6 @@ currentTimeHour = 0
 currentTimeMinute = 0
 
 red, green, blue = 0, 0, 0
-frame = ''
 image_folder = 'Pics'
 video_name = os.path.dirname(os.path.realpath(__file__)) + '/temp.avi'
 numOfPics = 0
@@ -101,12 +110,14 @@ def makeVideo():
 def savePicture(num):
     if not captureScreen:
         # CAPTURE WEBCAM
-        return_value, image = cap.read()
-        cv2.imwrite("Pics/{0}.png".format(num),image)
+        if local_camera:
+            return_value, image = cap.read()
+            cv2.imwrite("Pics/{0}.png".format(num),image)
     else:
         # CAPTURE SCREEN
         with mss.mss() as sct: filename = sct.shot(output=f'Pics/{num}.png')
 def findFaceInImage(num):
+    time.sleep(1)
     global TIME, EMAIL_TIME, numOfPics, captureScreen, recording, email_pictures, SMILEY_FACE, SEND_EMAIL_DELAY, START_TIME, cascade
     global saved_color, send_email, cap_screen, record_video, smiley_face, dark_mode, email_delay, picture_delay, saved_color, settings_json, selected_data_index, red, green, blue
     saved_color.clear()
@@ -148,7 +159,8 @@ def findFaceInImage(num):
     try:
         cropped_image_name = 'Cropped Image.png'
         image_name = 'Image.png'
-        img = cv2.imread(f'Pics/{num}.png')
+        # img = cv2.imread(f'Pics/video_feed.jpg')
+        img = frame
         if img.any() or img.all():
             gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
             faces = cascade.detectMultiScale(
@@ -178,7 +190,7 @@ def findFaceInImage(num):
                         for (ex,ey,ew,eh) in mouth: cv2.ellipse(roi_color_mouth, (int(ex + ew / 2), int(ey + eh / 8)), (int(ex), int(ey)), 0, 25, 155, (blue,green,red), 2)
                     else:
                         cv2.rectangle(img, (x, y), (x+w, y+h), (red, green, blue), 2)
-                img_cropped = cv2.imread(f'Pics/{num}.png')
+                img_cropped = cv2.imread(f'Pics/video_feed.jpg')
                 crop_img = img_cropped[y:y+h, x:x+w]
                 cv2.putText(img, datetime.now().strftime("%A %d %B %Y %I:%M:%S%p"), (10, img.shape[0] - 10), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (red, green, blue), 1)
                 cv2.imwrite(f'Pics/{image_name}', img)
@@ -206,14 +218,14 @@ def btnStop():
         clip_resized.write_videofile(os.path.dirname(os.path.realpath(__file__)) + "/output.mp4")
         os.remove(video_name)
         print("Deleted: {0}".format(video_name))
-    removePictures()
+    # removePictures()
     cap.release()
     cv2.destroyAllWindows()
     # sys.exit()
 def camRun():
     global isRunning, cap, frame, ret, firstFrame
     global TIME, EMAIL_TIME, numOfPics, captureScreen, recording, email_pictures, SMILEY_FACE, SEND_EMAIL_DELAY, START_TIME, cascade, faceDetection
-    global saved_color, send_email, cap_screen, record_video, smiley_face, dark_mode, email_delay, picture_delay, saved_color, settings_json, selected_data_index, red, green, blue, face_detect
+    global saved_color, send_email, cap_screen, record_video, smiley_face, dark_mode, email_delay, picture_delay, saved_color, settings_json, selected_data_index, red, green, blue, face_detect, ip_cam_url, ip_cam_usrname, ip_cam_pswd, is_ip_cam_on
     isRunning = True
     for i, j in enumerate(cascade_files):
         if j == '/home/jared/Documents/Github Clones/Security-System/Data Models/haarcascade_eye.xml': eye_cascade = cv2.CascadeClassifier(cascade_files[i])
@@ -226,11 +238,32 @@ def camRun():
     ap.add_argument("-a", "--min-area", type=int, default=500, help="minimum area size")
     args = vars(ap.parse_args())
     # while True:
-    ret, frame = cap.read()
+    for info in settings_json:
+        for ipcamurl in info['IP Camera URL']: ip_cam_url.append(ipcamurl)
+        for ipcamusr in info['IP Camera Username']: ip_cam_usrname.append(ipcamusr)
+        for ipcampsrw in info['IP Camera Password']: ip_cam_pswd.append(ipcampsrw)
+        for ipcamison in info ['is IP Camera on']: is_ip_cam_on.append(ipcamison)
+    if is_ip_cam_on[0] == 'False':
+        ret, frame = cap.read()
+    elif is_ip_cam_on[0] == 'True':
+        if timeToSend:
+            with open(settings_file) as file:
+                settings_json = json.load(file)
+            # for ipcamison in info ['is IP Camera on']: is_ip_cam_on.append(ipcamison)
+            url = ip_cam_url[0]
+            username = ip_cam_usrname[0]
+            password = ip_cam_pswd[0]
+            filename = 'Pics/video_feed.jpg'
+            r = requests.get(url, auth=(username,password))
+            if r.status_code == 200:
+                with open(filename, 'wb') as out:
+                    for bits in r.iter_content():
+                        out.write(bits)
+                frame = cv2.imread(f'Pics/video_feed.jpg')
     if faceDetection and isRunning:
         # Capture frame-by-frame
         text = "No face/s detected"
-        if ret:
+        if ret or frame.any():
             # Our operations on the frame come here
             gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
             # Detect faces in the image
@@ -261,17 +294,17 @@ def camRun():
                 else: cv2.rectangle(frame, (x, y), (x+w, y+h), (red, green, blue), 2)
             output.write(frame)
             if len(faces) >= 1: TIME = START_TIME
-            TIME -= 0.2
-            EMAIL_TIME += 0.2
+            # TIME -= 0.2
+            # EMAIL_TIME += 0.2
 
             if TIME >= 0 and recording:
                 numOfPics += 1
-                savePicture(numOfPics)
+                savePicture(datetime.now().strftime("%A %d %B %Y %I:%M:%S%p"))
             if EMAIL_TIME >= SEND_EMAIL_DELAY and len(faces) >= 1 and not recording and email_pictures and timeToSend:
                 numOfPics += 1
                 EMAIL_TIME = 0
+                savePicture(datetime.now().strftime("%A %d %B %Y %I:%M:%S%p"))
                 print(f'Found {len(faces)} faces! Pictures taken: {numOfPics}')
-                savePicture(numOfPics)
                 threading.Thread(target=findFaceInImage, args=(numOfPics,)).start()
             cv2.putText(frame, datetime.now().strftime("%A %d %B %Y %I:%M:%S%p"), (10, frame.shape[0] - 10), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (red, green, blue), 1)
         if SMILEY_FACE: cv2.putText(frame, f"Found {len(faces)} face/s!  Found {len(eyes)} eye/s!  Found {len(mouth)} mouth/s!", (10, 20), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (red, green, blue), 1)
@@ -288,24 +321,21 @@ def camRun():
         cnts = cv2.findContours(thresh.copy(), cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
         cnts = imutils.grab_contours(cnts)
         for c in cnts:
-            if cv2.contourArea(c) < args["min_area"]:
-                continue
+            if cv2.contourArea(c) < args["min_area"]: continue
             (x, y, w, h) = cv2.boundingRect(c)
             cv2.rectangle(frame, (x, y), (x + w, y + h), (red, green, blue), 2)
             text = "Movement"
             if len(cnts) >= 1: TIME = START_TIME
-            TIME -= 0.2
-            EMAIL_TIME += 0.2
 
             if TIME >= 0 and recording:
                 numOfPics += 1
-                savePicture(numOfPics)
+                savePicture(datetime.now().strftime("%A %d %B %Y %I:%M:%S%p"))
             if EMAIL_TIME >= SEND_EMAIL_DELAY and len(cnts) >= 1 and not recording and email_pictures and timeToSend:
                 numOfPics += 1
                 EMAIL_TIME = 0
                 print(f'Found {len(cnts)} faces! Pictures taken: {numOfPics}')
-                savePicture(numOfPics)
-                threading.Thread(target=findFaceInImage, args=(numOfPics,)).start()
+                savePicture(datetime.now().strftime("%A %d %B %Y %I:%M:%S%p"))
+                threading.Thread(target=findFaceInImage, args=(datetime.now().strftime("%A %d %B %Y %I:%M:%S%p"),)).start()
         cv2.putText(frame, "Room Status: {}".format(text), (10, 20), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (red, green, blue), 2)
         cv2.putText(frame, datetime.now().strftime("%A %d %B %Y %I:%M:%S%p"), (10, frame.shape[0] - 10), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (red, green, blue), 1)
         # show the frame and record if the user presses a key
@@ -317,8 +347,8 @@ def camRun():
         time.sleep(0.03)
     if isRunning == False: btnStop()
     if cv2.waitKey(1) & 0xFF == ord('q'): btnStop()
-    if ret:
-        return ret, frame
+    if ret or frame.any():
+        return frame
         # cv2.imshow('Camera', frame)
         # main.frame = frame
         # main.rets = ret
@@ -328,7 +358,9 @@ def exit_handler():
 def update_variables():
     while True:
         global TIME, EMAIL_TIME, currentTime, lastCurrentTime, numOfPics, captureScreen, recording, email_pictures, SMILEY_FACE, SEND_EMAIL_DELAY, START_TIME, cascade, faceDetection
-        global saved_color, alwaysOnList, alwaysOn, send_email, cap_screen, record_video, smiley_face, dark_mode, email_delay, picture_delay, saved_color, settings_json, selected_data_index, red, green, blue, face_detect
+        global saved_color, alwaysOnList, alwaysOn, send_email, cap_screen, record_video, smiley_face, dark_mode, email_delay, picture_delay, saved_color, settings_json, selected_data_index, red, green, blue, face_detect, ip_cam_url, ip_cam_usrname, ip_cam_pswd, is_ip_cam_on
+        TIME -= 1
+        EMAIL_TIME += 1
         saved_color.clear()
         send_email.clear()
         cap_screen.clear()
@@ -340,6 +372,10 @@ def update_variables():
         selected_data_index.clear()
         face_detect.clear()
         alwaysOnList.clear()
+        ip_cam_url.clear()
+        ip_cam_usrname.clear()
+        ip_cam_pswd.clear()
+        is_ip_cam_on.clear()
         with open(settings_file) as file:
             settings_json = json.load(file)
             for info in settings_json:
@@ -353,6 +389,10 @@ def update_variables():
                 for picture in info['picture delay']: picture_delay.append(picture)
                 for ind in info['selected data index']: selected_data_index.append(ind)
                 for face in info['face detect']: face_detect.append(face)
+                for ipcamurl in info['IP Camera URL']: ip_cam_url.append(ipcamurl)
+                for ipcamusr in info['IP Camera Username']: ip_cam_usrname.append(ipcamusr)
+                for ipcampsrw in info['IP Camera Password']: ip_cam_pswd.append(ipcampsrw)
+                for ipcamison in info ['is IP Camera on']: is_ip_cam_on.append(ipcamison)
             with open(cycles_file) as file:
                 cycles_json = json.load(file)
                 for info in cycles_json:
@@ -389,7 +429,7 @@ def isTimeToSend():
     currentTimeDay = "".join(currentTimeDay)
     
     currentTimeHour = "".join(currentTimeHour)
-    if currentTimeDay == 'P':
+    if currentTimeDay == 'P' and not currentTimeHour == '12':
         currentTimeHour = int(currentTimeHour)
         currentTimeHour += 12
     currentTimeMinute = "".join(currentTimeMinute)
@@ -467,12 +507,31 @@ def isTimeToSend():
         timeToSend = True
         print(timeToSend)
         return
+def get_cam_image():
+    global frame
+    with open(settings_file) as file:
+        settings_json = json.load(file)
+        for info in settings_json:
+            for ipcamurl in info['IP Camera URL']: ip_cam_url.append(ipcamurl)
+            for ipcamusr in info['IP Camera Username']: ip_cam_usrname.append(ipcamusr)
+            for ipcampsrw in info['IP Camera Password']: ip_cam_pswd.append(ipcampsrw)
+    # for ipcamison in info ['is IP Camera on']: is_ip_cam_on.append(ipcamison)
+    url = ip_cam_url[0]
+    username = ip_cam_usrname[0]
+    password = ip_cam_pswd[0]
+    filename = 'Pics/video_feed.jpg'
+    r = requests.get(url, auth=(username,password))
+    if r.status_code == 200:
+        with open(filename, 'wb') as out:
+            for bits in r.iter_content(): out.write(bits)
+        frame = cv2.imread(f'Pics/video_feed.jpg')
     
 def start_cam():
     global isRunning
     isRunning = True
     atexit.register(exit_handler)
     threading.Thread(target = update_variables).start()
+    get_cam_image()
     # threading.Thread(target=camRun).start()
     # camRun()
 def end_cam():

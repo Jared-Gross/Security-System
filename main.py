@@ -14,16 +14,22 @@ from PyQt5.QtWidgets import *
 from PyQt5.QtCore import *
 from PyQt5.QtGui import *
 from PyQt5 import *
+import urllib, requests
+import urllib.request
+from urllib.parse import *
 # sudo -H python3 -m pip install --trusted-host pypi.python.org --trusted-host files.pythonhosted.org --trusted-host pypi.org [NAME]
 
 # CAMERA SCRIPT
 import camera
-settings_file = os.path.dirname(os.path.realpath(__file__)) + '/settings.json'
-settings_json = []
 
+
+# CONFIGURATION variables
 cascade_files_dir = os.path.dirname(os.path.realpath(__file__)) + '/Data Models'
 cascade_files = [f for f in listdir(cascade_files_dir) if isfile(join(cascade_files_dir, f))]
 isActive = False
+
+settings_file = os.path.dirname(os.path.realpath(__file__)) + '/settings.json'
+settings_json = []
 
 saved_color = []
 send_email = []
@@ -36,15 +42,22 @@ face_detect = []
 
 email_address = []
 
+is_ip_cam_on = []
+ip_cam_url = []
+ip_cam_usrname = []
+ip_cam_pswd = []
+is_ip_cam_working = True
+
 email_delay = []
 picture_delay = []
 selected_data_index = []
 button_css = ''
 frame = None
 ret = None
-
+rgbImage = None
 outputFrame = None
 
+# CYCLE variables
 cycles_file = os.path.dirname(os.path.realpath(__file__)) + '/cycles.json'
 cycles_json = []
 
@@ -62,6 +75,7 @@ OffFrom_textboxes = []
 isTimeToSendEmail = False
 running = True
 
+# SERVER variables
 framesPerSecond = 0
 lock = threading.Lock()
 appWeb = Flask(__name__)
@@ -98,6 +112,9 @@ class MainMenu(QMainWindow):
     def open_cycle_menu(self):
         self.c = CycleMenu()
         self.c.show()
+    def open_add_usr_pass_menu(self):
+        self.m = IpCamLogin()
+        self.m.show()
     def closeEvent(self, event):
         exit_handler()
     @pyqtSlot(QImage)
@@ -128,7 +145,7 @@ class MainMenu(QMainWindow):
         themesMenu = QMenu('Themes', self)
         
         self.systemmode = QAction('System default', self, checkable = True)
-        self.systemmode.setStatusTip('enable/disable Light mode')
+        self.systemmode.setStatusTip('enable/disable System mode')
         self.systemmode.setChecked(True if dark_mode[0] == '0' else False)
         self.systemmode.triggered.connect(partial(self.checkboxClicked, self.systemmode, 'System mode'))
         
@@ -191,6 +208,15 @@ class MainMenu(QMainWindow):
         self.sendEmails.triggered.connect(partial(self.checkboxClicked, self.sendEmails, 'Send Emails'))
         self.sendEmails.setStatusTip('Send emails when Motion/Face detected.')
         
+        self.IpCam = QAction('IP Camera', self, checkable=True)
+        self.IpCam.setChecked(True if is_ip_cam_on[0] == 'True' else False)
+        self.IpCam.triggered.connect(partial(self.checkboxClicked, self.IpCam, 'IP Cam'))
+        self.IpCam.setStatusTip('Connects to a camera with an IP Address')
+        
+        self.ChangeIpCam = QAction('Change IP Login', self)
+        self.ChangeIpCam.triggered.connect(self.open_add_usr_pass_menu)
+        self.ChangeIpCam.setStatusTip('Change Logins to IP Camera')
+        
         smileyFace = QAction('Smiley Face Addon', self, checkable=True)
         smileyFace.setChecked(True if smiley_face[0] == 'True' else False)
         smileyFace.triggered.connect(partial(self.checkboxClicked, smileyFace, 'Smiley Face Addon'))
@@ -211,12 +237,19 @@ class MainMenu(QMainWindow):
         detectionMenu.addAction(self.motionDetection)
         
         self.settingsMenu.addAction(self.cycleMenu)
+        self.settingsMenu.addSeparator()
         self.settingsMenu.addAction(self.colorMenu)
         # self.settingsMenu.addAction(recordvideo)
         self.settingsMenu.addAction(captureScreen)
-        self.settingsMenu.addAction(self.sendEmails)
+        self.settingsMenu.addSeparator()
+        self.settingsMenu.addAction(self.IpCam)
+        self.settingsMenu.addAction(self.ChangeIpCam)
+        self.settingsMenu.addSeparator()
         self.settingsMenu.addAction(smileyFace)
+        self.settingsMenu.addSeparator()
         self.settingsMenu.addMenu(detectionMenu)
+        self.settingsMenu.addSeparator()
+        self.settingsMenu.addAction(self.sendEmails)
         self.settingsMenu.addAction(self.emailDelay)
         self.settingsMenu.addAction(self.email)
         if not email_address[0] == '': self.settingsMenu.addAction(self.removeEmail)
@@ -227,7 +260,7 @@ class MainMenu(QMainWindow):
         super(MainMenu, self).resizeEvent(event)
         self.menubar.resize(self.width(), self.menubar.height())
     def change_ip_address(self, t):
-        global saved_color, auto_start_server, ip, send_email, cap_screen, record_video, smiley_face, dark_mode, email_delay, picture_delay, saved_color, settings_json, button_css, selected_data_index, face_detect, email_address
+        global saved_color, auto_start_server, ip, send_email, cap_screen, record_video, smiley_face, dark_mode, email_delay, picture_delay, saved_color, settings_json, button_css, selected_data_index, face_detect, email_address, ip_cam_url, ip_cam_usrname, ip_cam_pswd, is_ip_cam_on
         if t == '': inputIP, done1 = QInputDialog.getText(self, 'Change IP', 'IP Address:', echo=QLineEdit.Normal, text=str(ip[0]))
         else: inputIP, done1 = QInputDialog.getText(self, 'Change IP', 'IP Address:', echo=QLineEdit.Normal, text=t)
         if done1:
@@ -247,7 +280,11 @@ class MainMenu(QMainWindow):
                         "face detect":[face_detect[0]],
                         "email address": [email_address[0]],
                         "server auto start": [auto_start_server[0]],
-                        "host address": [inputIP]
+                        "host address": [inputIP],
+                        "IP Camera URL": [ip_cam_url[0]],
+                        "IP Camera Username": [ip_cam_usrname[0]],
+                        "IP Camera Password": [ip_cam_pswd[0]],
+                        "is IP Camera on": [is_ip_cam_on[0]]
                     })
                     with open(settings_file, mode='w+', encoding='utf-8') as file:
                         json.dump(settings_json, file, ensure_ascii=True, indent=4, sort_keys=False)
@@ -263,6 +300,10 @@ class MainMenu(QMainWindow):
                         face_detect.clear()
                         email_address.clear()
                         auto_start_server.clear()
+                        ip_cam_url.clear()
+                        ip_cam_usrname.clear()
+                        ip_cam_pswd.clear()
+                        is_ip_cam_on.clear()
                         ip.clear()
                         settings_json = json.load(file)
                         for info in settings_json:
@@ -279,6 +320,10 @@ class MainMenu(QMainWindow):
                             for picture in info['picture delay']: picture_delay.append(picture)
                             for autostart in info['server auto start']: auto_start_server.append(autostart)
                             for ipaddress in info['host address']: ip.append(ipaddress)
+                            for ipcamurl in info['IP Camera URL']: ip_cam_url.append(ipcamurl)
+                            for ipcamusr in info['IP Camera Username']: ip_cam_usrname.append(ipcamusr)
+                            for ipcampsrw in info['IP Camera Password']: ip_cam_pswd.append(ipcampsrw)
+                            for ipcamison in info ['is IP Camera on']: is_ip_cam_on.append(ipcamison)
                     
                     self.setIP.setStatusTip(f'The server will connect to the current IP address - {ip[0]}')
                     return
@@ -289,7 +334,7 @@ class MainMenu(QMainWindow):
                 else: return  
         else: return
     def verifyEmailAddress(self, s, add):
-        global saved_color, auto_start_server, ip, send_email, cap_screen, record_video, smiley_face, dark_mode, email_delay, picture_delay, saved_color, settings_json, button_css, selected_data_index, face_detect, email_address
+        global saved_color, auto_start_server, ip, send_email, cap_screen, record_video, smiley_face, dark_mode, email_delay, picture_delay, saved_color, settings_json, button_css, selected_data_index, face_detect, email_address, ip_cam_url, ip_cam_usrname, ip_cam_pswd, is_ip_cam_on
         rx = re.compile(r"^[A-Za-z0-9\.\+_-]+@[A-Za-z0-9\._-]+\.[a-zA-Z]*$")
         email, done1 = QInputDialog.getText(self, 'Add Email', 'Email Address:', echo=QLineEdit.Normal, text=s)
         if done1:
@@ -316,7 +361,11 @@ class MainMenu(QMainWindow):
                     "face detect":[face_detect[0]],
                     "email address": [email],
                     "server auto start": [auto_start_server[0]],
-                    "host address": [ip[0]]
+                    "host address": [ip[0]],
+                    "IP Camera URL": [ip_cam_url[0]],
+                    "IP Camera Username": [ip_cam_usrname[0]],
+                    "IP Camera Password": [ip_cam_pswd[0]],
+                    "is IP Camera on": [is_ip_cam_on[0]]
                 })
 
                 with open(settings_file, mode='w+', encoding='utf-8') as file:
@@ -333,6 +382,10 @@ class MainMenu(QMainWindow):
                     face_detect.clear()
                     email_address.clear()
                     auto_start_server.clear()
+                    ip_cam_url.clear()
+                    ip_cam_usrname.clear()
+                    ip_cam_pswd.clear()
+                    is_ip_cam_on.clear()
                     ip.clear()
                     settings_json = json.load(file)
                     for info in settings_json:
@@ -349,6 +402,10 @@ class MainMenu(QMainWindow):
                         for picture in info['picture delay']: picture_delay.append(picture)
                         for autostart in info['server auto start']: auto_start_server.append(autostart)
                         for ipaddress in info['host address']: ip.append(ipaddress)
+                        for ipcamurl in info['IP Camera URL']: ip_cam_url.append(ipcamurl)
+                        for ipcamusr in info['IP Camera Username']: ip_cam_usrname.append(ipcamusr)
+                        for ipcampsrw in info['IP Camera Password']: ip_cam_pswd.append(ipcampsrw)
+                        for ipcamison in info ['is IP Camera on']: is_ip_cam_on.append(ipcamison)
                 self.email.setText(f'Add Email')
                 self.email.setStatusTip(f'Your email address\'s is currently set too: {email_address[0]}')
                 self.removeEmail.setStatusTip(f'Remove an email address from {email_address[0]}.')
@@ -361,7 +418,7 @@ class MainMenu(QMainWindow):
                 else:
                     return
     def removeEmailAddress(self):
-        global saved_color, auto_start_server, ip, send_email, cap_screen, record_video, smiley_face, dark_mode, email_delay, picture_delay, saved_color, settings_json, button_css, selected_data_index, face_detect, email_address
+        global saved_color, auto_start_server, ip, send_email, cap_screen, record_video, smiley_face, dark_mode, email_delay, picture_delay, saved_color, settings_json, button_css, selected_data_index, face_detect, email_address, ip_cam_url, ip_cam_usrname, ip_cam_pswd, is_ip_cam_on
         email_typed = ''
         email_typed, done1 = QInputDialog.getText(self, 'Remove Email', f'Which email would you like to remve?\n\n{email_address[0]}', echo=QLineEdit.Normal, text='')
         found = False
@@ -372,20 +429,14 @@ class MainMenu(QMainWindow):
                     temp.pop(i)
                     found = True
                     continue
-                if found:
-                    continue
+                if found: continue
             if not found:
                 button = QMessageBox.critical(self, "Email address not found.", f"\"{email_typed}\" is an Invalid email address, please try again.", QMessageBox.Yes | QMessageBox.No, QMessageBox.Yes)
-                if button == QMessageBox.Yes:
-                    self.removeEmailAddress()
-                else:
-                    return
+                if button == QMessageBox.Yes: self.removeEmailAddress()
+                else: return
             if found:
-                print(temp)
                 temp = ", ".join(temp)
-                print(temp)
-                if any((c in temp) for c in temp) and temp[0] == ",":
-                    temp = temp[2:]
+                if any((c in temp) for c in temp) and temp[0] == ",": temp = temp[2:]
                 email = temp
                 settings_json.pop(0)
                 settings_json.append({
@@ -401,7 +452,11 @@ class MainMenu(QMainWindow):
                     "face detect":[face_detect[0]],
                     "email address": [email],
                     "server auto start": [auto_start_server[0]],
-                    "host address": [ip[0]]
+                    "host address": [ip[0]],
+                    "IP Camera URL": [ip_cam_url[0]],
+                    "IP Camera Username": [ip_cam_usrname[0]],
+                    "IP Camera Password": [ip_cam_pswd[0]],
+                    "is IP Camera on": [is_ip_cam_on[0]]
                 })
                 with open(settings_file, mode='w+', encoding='utf-8') as file:
                     json.dump(settings_json, file, ensure_ascii=True, indent=4, sort_keys=False)
@@ -417,6 +472,10 @@ class MainMenu(QMainWindow):
                     face_detect.clear()
                     email_address.clear()
                     auto_start_server.clear()
+                    ip_cam_url.clear()
+                    ip_cam_usrname.clear()
+                    ip_cam_pswd.clear()
+                    is_ip_cam_on.clear()
                     ip.clear()
                     settings_json = json.load(file)
                     for info in settings_json:
@@ -433,6 +492,10 @@ class MainMenu(QMainWindow):
                         for picture in info['picture delay']: picture_delay.append(picture)
                         for autostart in info['server auto start']: auto_start_server.append(autostart)
                         for ipaddress in info['host address']: ip.append(ipaddress)
+                        for ipcamurl in info['IP Camera URL']: ip_cam_url.append(ipcamurl)
+                        for ipcamusr in info['IP Camera Username']: ip_cam_usrname.append(ipcamusr)
+                        for ipcampsrw in info['IP Camera Password']: ip_cam_pswd.append(ipcampsrw)
+                        for ipcamison in info ['is IP Camera on']: is_ip_cam_on.append(ipcamison)
                 self.email.setText(f'Add Email')
                 self.email.setStatusTip(f'Your email address is currently set too: {email_address[0]}')
                 self.removeEmail.setStatusTip(f'Remove an email address from {email_address[0]}.')
@@ -459,7 +522,7 @@ class MainMenu(QMainWindow):
         groupBox.setLayout(vbox)
         return groupBox
     def comboBoxChanged(self):
-        global saved_color, send_email, ip, auto_start_server, cap_screen, record_video, smiley_face, dark_mode, email_delay, picture_delay, saved_color, settings_json, button_css, selected_data_index, face_detect, email_address
+        global saved_color, send_email, ip, auto_start_server, cap_screen, record_video, smiley_face, dark_mode, email_delay, picture_delay, saved_color, settings_json, button_css, selected_data_index, face_detect, email_address, ip_cam_url, ip_cam_usrname, ip_cam_pswd, is_ip_cam_on
         self.motionDetection.setStatusTip(f'Enable: Motion detection. Disable: {self.cascadeList.currentText()} detection.')
         self.faceDetection.setStatusTip(f'Enable: {self.cascadeList.currentText()} detection. Disable: Motion detection.')
         self.faceDetection.setText(f'{self.cascadeList.currentText()} Detection')
@@ -477,7 +540,11 @@ class MainMenu(QMainWindow):
             "face detect":[face_detect[0]],
             "email address": [email_address[0]],
             "server auto start": [auto_start_server[0]],
-            "host address": [ip[0]]
+            "host address": [ip[0]],
+            "IP Camera URL": [ip_cam_url[0]],
+            "IP Camera Username": [ip_cam_usrname[0]],
+            "IP Camera Password": [ip_cam_pswd[0]],
+            "is IP Camera on": [is_ip_cam_on[0]]
         })
         with open(settings_file, mode='w+', encoding='utf-8') as file:
             json.dump(settings_json, file, ensure_ascii=True, indent=4, sort_keys=False)
@@ -494,6 +561,10 @@ class MainMenu(QMainWindow):
             face_detect.clear()
             email_address.clear()
             auto_start_server.clear()
+            ip_cam_url.clear()
+            ip_cam_usrname.clear()
+            ip_cam_pswd.clear()
+            is_ip_cam_on.clear()
             ip.clear()
             settings_json = json.load(file)
             for info in settings_json:
@@ -510,9 +581,13 @@ class MainMenu(QMainWindow):
                 for picture in info['picture delay']: picture_delay.append(picture)
                 for autostart in info['server auto start']: auto_start_server.append(autostart)
                 for ipaddress in info['host address']: ip.append(ipaddress)
+                for ipcamurl in info['IP Camera URL']: ip_cam_url.append(ipcamurl)
+                for ipcamusr in info['IP Camera Username']: ip_cam_usrname.append(ipcamusr)
+                for ipcampsrw in info['IP Camera Password']: ip_cam_pswd.append(ipcampsrw)
+                for ipcamison in info ['is IP Camera on']: is_ip_cam_on.append(ipcamison)
     def verifyEmailDelay(self):
-        global saved_color, auto_start_server, ip, send_email, cap_screen, record_video, smiley_face, dark_mode, email_delay, picture_delay, saved_color, settings_json, button_css, selected_data_index, face_detect, email_address
-        delay, done1 = QInputDialog.getDouble(self, "Get double","Value:", int(email_delay[0]), 10, 999999, 0)
+        global saved_color, auto_start_server, ip, send_email, cap_screen, record_video, smiley_face, dark_mode, email_delay, picture_delay, saved_color, settings_json, button_css, selected_data_index, face_detect, email_address, ip_cam_url, ip_cam_usrname, ip_cam_pswd, is_ip_cam_on
+        delay, done1 = QInputDialog.getDouble(self, "Email Delay (seconds)","Value:", int(email_delay[0]), 10, 999999, 0)
         if done1:
             if delay >= 10:
                 settings_json.pop(0)
@@ -529,7 +604,11 @@ class MainMenu(QMainWindow):
                     "face detect":[face_detect[0]],
                     "email address": [email_address[0]],
                     "server auto start": [auto_start_server[0]],
-                    "host address": [ip[0]]
+                    "host address": [ip[0]],
+                    "IP Camera URL": [ip_cam_url[0]],
+                    "IP Camera Username": [ip_cam_usrname[0]],
+                    "IP Camera Password": [ip_cam_pswd[0]],
+                    "is IP Camera on": [is_ip_cam_on[0]]
                 })
                 with open(settings_file, mode='w+', encoding='utf-8') as file:
                     json.dump(settings_json, file, ensure_ascii=True, indent=4, sort_keys=False)
@@ -545,6 +624,10 @@ class MainMenu(QMainWindow):
                     face_detect.clear()
                     email_address.clear()
                     auto_start_server.clear()
+                    ip_cam_url.clear()
+                    ip_cam_usrname.clear()
+                    ip_cam_pswd.clear()
+                    is_ip_cam_on.clear()
                     ip.clear()
                     settings_json = json.load(file)
                     for info in settings_json:
@@ -561,12 +644,16 @@ class MainMenu(QMainWindow):
                         for picture in info['picture delay']: picture_delay.append(picture)
                         for autostart in info['server auto start']: auto_start_server.append(autostart)
                         for ipaddress in info['host address']: ip.append(ipaddress)
+                        for ipcamurl in info['IP Camera URL']: ip_cam_url.append(ipcamurl)
+                        for ipcamusr in info['IP Camera Username']: ip_cam_usrname.append(ipcamusr)
+                        for ipcampsrw in info['IP Camera Password']: ip_cam_pswd.append(ipcampsrw)
+                        for ipcamison in info ['is IP Camera on']: is_ip_cam_on.append(ipcamison)
                 # button = QMessageBox.information(self, "Success", f"The email: \"{email}\" has been successfully saved!", QMessageBox.Ok, QMessageBox.Ok)
                 self.emailDelay.setText(f'Set Email send delay - {email_delay[0]}')
                 self.emailDelay.setStatusTip(f'Your email send delay is currently set too: {email_delay[0]}')
     @pyqtSlot()
     def Open_Color_Dialog(self):
-        global saved_color, auto_start_server, ip, send_email, cap_screen, record_video, smiley_face, dark_mode, email_delay, picture_delay, saved_color, settings_json, button_css, selected_data_index, face_detect, email_address
+        global saved_color, auto_start_server, ip, send_email, cap_screen, record_video, smiley_face, dark_mode, email_delay, picture_delay, saved_color, settings_json, button_css, selected_data_index, face_detect, email_address, ip_cam_url, ip_cam_usrname, ip_cam_pswd, is_ip_cam_on
         color = QColorDialog.getColor()
         if color.isValid():
             settings_json.pop(0)
@@ -583,7 +670,11 @@ class MainMenu(QMainWindow):
                 "face detect":[face_detect[0]],
                 "email address": [email_address[0]],
                 "server auto start": [auto_start_server[0]],
-                "host address": [ip[0]]
+                "host address": [ip[0]],
+                "IP Camera URL": [ip_cam_url[0]],
+                "IP Camera Username": [ip_cam_usrname[0]],
+                "IP Camera Password": [ip_cam_pswd[0]],
+                "is IP Camera on": [is_ip_cam_on[0]]
             })
             with open(settings_file, mode='w+', encoding='utf-8') as file:
                 json.dump(settings_json, file, ensure_ascii=True, indent=4, sort_keys=False)
@@ -600,6 +691,10 @@ class MainMenu(QMainWindow):
                 face_detect.clear()
                 email_address.clear()
                 auto_start_server.clear()
+                ip_cam_url.clear()
+                ip_cam_usrname.clear()
+                ip_cam_pswd.clear()
+                is_ip_cam_on.clear()
                 ip.clear()
                 settings_json = json.load(file)
                 for info in settings_json:
@@ -616,9 +711,13 @@ class MainMenu(QMainWindow):
                     for picture in info['picture delay']: picture_delay.append(picture)
                     for autostart in info['server auto start']: auto_start_server.append(autostart)
                     for ipaddress in info['host address']: ip.append(ipaddress)
+                    for ipcamurl in info['IP Camera URL']: ip_cam_url.append(ipcamurl)
+                    for ipcamusr in info['IP Camera Username']: ip_cam_usrname.append(ipcamusr)
+                    for ipcampsrw in info['IP Camera Password']: ip_cam_pswd.append(ipcampsrw)
+                    for ipcamison in info ['is IP Camera on']: is_ip_cam_on.append(ipcamison)
         button_css = 'background-color: rgb(' + str(saved_color[0]) + ', ' + str(saved_color[1]) + ', ' + str(saved_color[2]) + ');'
     def checkboxClicked(self, b, name, m):
-        global auto_start_server, saved_color, ip, send_email, cap_screen, record_video, smiley_face, dark_mode, email_delay, picture_delay, saved_color, settings_json, selected_data_index, face_detect, email_address
+        global auto_start_server, saved_color, ip, send_email, cap_screen, record_video, smiley_face, dark_mode, email_delay, picture_delay, saved_color, settings_json, selected_data_index, face_detect, email_address, ip_cam_url, ip_cam_usrname, ip_cam_pswd, is_ip_cam_on
         # b.setStyleSheet('background-color: hsl(126, 81%, 29%)') if b.isChecked() == True else b.setStyleSheet('background-color: rgb(106, 11, 11)')
         if name == "Capture Screen":
             if b.isChecked() == True:
@@ -636,7 +735,11 @@ class MainMenu(QMainWindow):
                     "face detect":[face_detect[0]],
                     "email address": [email_address[0]],
                     "server auto start": [auto_start_server[0]],
-                    "host address": [ip[0]]
+                    "host address": [ip[0]],
+                    "IP Camera URL": [ip_cam_url[0]],
+                    "IP Camera Username": [ip_cam_usrname[0]],
+                    "IP Camera Password": [ip_cam_pswd[0]],
+                    "is IP Camera on": [is_ip_cam_on[0]]
                 })
                 with open(settings_file, mode='w+', encoding='utf-8') as file:
                     json.dump(settings_json, file, ensure_ascii=True, indent=4, sort_keys=False)
@@ -655,7 +758,11 @@ class MainMenu(QMainWindow):
                     "face detect":[face_detect[0]],
                     "email address": [email_address[0]],
                     "server auto start": [auto_start_server[0]],
-                    "host address": [ip[0]]
+                    "host address": [ip[0]],
+                    "IP Camera URL": [ip_cam_url[0]],
+                    "IP Camera Username": [ip_cam_usrname[0]],
+                    "IP Camera Password": [ip_cam_pswd[0]],
+                    "is IP Camera on": [is_ip_cam_on[0]]
                 })
                 with open(settings_file, mode='w+', encoding='utf-8') as file:
                     json.dump(settings_json, file, ensure_ascii=True, indent=4, sort_keys=False)
@@ -675,7 +782,11 @@ class MainMenu(QMainWindow):
                     "face detect":[face_detect[0]],
                     "email address": [email_address[0]],
                     "server auto start": [auto_start_server[0]],
-                    "host address": [ip[0]]
+                    "host address": [ip[0]],
+                    "IP Camera URL": [ip_cam_url[0]],
+                    "IP Camera Username": [ip_cam_usrname[0]],
+                    "IP Camera Password": [ip_cam_pswd[0]],
+                    "is IP Camera on": [is_ip_cam_on[0]]
                 })
                 with open(settings_file, mode='w+', encoding='utf-8') as file:
                     json.dump(settings_json, file, ensure_ascii=True, indent=4, sort_keys=False)
@@ -694,7 +805,11 @@ class MainMenu(QMainWindow):
                     "face detect":[face_detect[0]],
                     "email address": [email_address[0]],
                     "server auto start": [auto_start_server[0]],
-                    "host address": [ip[0]]
+                    "host address": [ip[0]],
+                    "IP Camera URL": [ip_cam_url[0]],
+                    "IP Camera Username": [ip_cam_usrname[0]],
+                    "IP Camera Password": [ip_cam_pswd[0]],
+                    "is IP Camera on": [is_ip_cam_on[0]]
                 })
                 with open(settings_file, mode='w+', encoding='utf-8') as file:
                     json.dump(settings_json, file, ensure_ascii=True, indent=4, sort_keys=False)
@@ -715,7 +830,11 @@ class MainMenu(QMainWindow):
                         "face detect":[face_detect[0]],
                         "email address": [email_address[0]],
                         "server auto start": [auto_start_server[0]],
-                    "host address": [ip[0]]
+                        "host address": [ip[0]],
+                        "IP Camera URL": [ip_cam_url[0]],
+                        "IP Camera Username": [ip_cam_usrname[0]],
+                        "IP Camera Password": [ip_cam_pswd[0]],
+                        "is IP Camera on": [is_ip_cam_on[0]]
                     })
                     with open(settings_file, mode='w+', encoding='utf-8') as file:
                         json.dump(settings_json, file, ensure_ascii=True, indent=4, sort_keys=False)
@@ -738,7 +857,11 @@ class MainMenu(QMainWindow):
                     "face detect":[face_detect[0]],
                     "email address": [email_address[0]],
                     "server auto start": [auto_start_server[0]],
-                    "host address": [ip[0]]
+                    "host address": [ip[0]],
+                    "IP Camera URL": [ip_cam_url[0]],
+                    "IP Camera Username": [ip_cam_usrname[0]],
+                    "IP Camera Password": [ip_cam_pswd[0]],
+                    "is IP Camera on": [is_ip_cam_on[0]]
                 })
                 with open(settings_file, mode='w+', encoding='utf-8') as file:
                     json.dump(settings_json, file, ensure_ascii=True, indent=4, sort_keys=False)
@@ -766,7 +889,11 @@ class MainMenu(QMainWindow):
                     "face detect":[face_detect[0]],
                     "email address": [email_address[0]],
                     "server auto start": [auto_start_server[0]],
-                    "host address": [ip[0]]
+                    "host address": [ip[0]],
+                    "IP Camera URL": [ip_cam_url[0]],
+                    "IP Camera Username": [ip_cam_usrname[0]],
+                    "IP Camera Password": [ip_cam_pswd[0]],
+                    "is IP Camera on": [is_ip_cam_on[0]]
                 })
                 with open(settings_file, mode='w+', encoding='utf-8') as file:
                     json.dump(settings_json, file, ensure_ascii=True, indent=4, sort_keys=False)
@@ -785,7 +912,11 @@ class MainMenu(QMainWindow):
                     "face detect":[face_detect[0]],
                     "email address": [email_address[0]],
                     "server auto start": [auto_start_server[0]],
-                    "host address": [ip[0]]
+                    "host address": [ip[0]],
+                    "IP Camera URL": [ip_cam_url[0]],
+                    "IP Camera Username": [ip_cam_usrname[0]],
+                    "IP Camera Password": [ip_cam_pswd[0]],
+                    "is IP Camera on": [is_ip_cam_on[0]]
                 })
                 with open(settings_file, mode='w+', encoding='utf-8') as file:
                     json.dump(settings_json, file, ensure_ascii=True, indent=4, sort_keys=False)
@@ -826,7 +957,11 @@ class MainMenu(QMainWindow):
                     "face detect":[face_detect[0]],
                     "email address": [email_address[0]],
                     "server auto start": [auto_start_server[0]],
-                    "host address": [ip[0]]
+                    "host address": [ip[0]],
+                    "IP Camera URL": [ip_cam_url[0]],
+                    "IP Camera Username": [ip_cam_usrname[0]],
+                    "IP Camera Password": [ip_cam_pswd[0]],
+                    "is IP Camera on": [is_ip_cam_on[0]]
                 })
                 with open(settings_file, mode='w+', encoding='utf-8') as file:
                     json.dump(settings_json, file, ensure_ascii=True, indent=4, sort_keys=False)
@@ -848,7 +983,11 @@ class MainMenu(QMainWindow):
                     "face detect":[face_detect[0]],
                     "email address": [email_address[0]],
                     "server auto start": [auto_start_server[0]],
-                    "host address": [ip[0]]
+                    "host address": [ip[0]],
+                    "IP Camera URL": [ip_cam_url[0]],
+                    "IP Camera Username": [ip_cam_usrname[0]],
+                    "IP Camera Password": [ip_cam_pswd[0]],
+                    "is IP Camera on": [is_ip_cam_on[0]]
                 })
                 with open(settings_file, mode='w+', encoding='utf-8') as file:
                     json.dump(settings_json, file, ensure_ascii=True, indent=4, sort_keys=False)
@@ -879,7 +1018,11 @@ class MainMenu(QMainWindow):
                     "face detect":[face_detect[0]],
                     "email address": [email_address[0]],
                     "server auto start": [auto_start_server[0]],
-                    "host address": [ip[0]]
+                    "host address": [ip[0]],
+                    "IP Camera URL": [ip_cam_url[0]],
+                    "IP Camera Username": [ip_cam_usrname[0]],
+                    "IP Camera Password": [ip_cam_pswd[0]],
+                    "is IP Camera on": [is_ip_cam_on[0]]
                 })
                 with open(settings_file, mode='w+', encoding='utf-8') as file:
                     json.dump(settings_json, file, ensure_ascii=True, indent=4, sort_keys=False)
@@ -901,7 +1044,11 @@ class MainMenu(QMainWindow):
                     "face detect":[face_detect[0]],
                     "email address": [email_address[0]],
                     "server auto start": [auto_start_server[0]],
-                    "host address": [ip[0]]
+                    "host address": [ip[0]],
+                    "IP Camera URL": [ip_cam_url[0]],
+                    "IP Camera Username": [ip_cam_usrname[0]],
+                    "IP Camera Password": [ip_cam_pswd[0]],
+                    "is IP Camera on": [is_ip_cam_on[0]]
                 })
                 with open(settings_file, mode='w+', encoding='utf-8') as file:
                     json.dump(settings_json, file, ensure_ascii=True, indent=4, sort_keys=False)
@@ -924,7 +1071,11 @@ class MainMenu(QMainWindow):
                     "face detect":[face_detect[0]],
                     "email address": [email_address[0]],
                     "server auto start": [auto_start_server[0]],
-                    "host address": [ip[0]]
+                    "host address": [ip[0]],
+                    "IP Camera URL": [ip_cam_url[0]],
+                    "IP Camera Username": [ip_cam_usrname[0]],
+                    "IP Camera Password": [ip_cam_pswd[0]],
+                    "is IP Camera on": [is_ip_cam_on[0]]
                 })
                 with open(settings_file, mode='w+', encoding='utf-8') as file:
                     json.dump(settings_json, file, ensure_ascii=True, indent=4, sort_keys=False)
@@ -947,7 +1098,11 @@ class MainMenu(QMainWindow):
                     "face detect":[face_detect[0]],
                     "email address": [email_address[0]],
                     "server auto start": [auto_start_server[0]],
-                    "host address": [ip[0]]
+                    "host address": [ip[0]],
+                    "IP Camera URL": [ip_cam_url[0]],
+                    "IP Camera Username": [ip_cam_usrname[0]],
+                    "IP Camera Password": [ip_cam_pswd[0]],
+                    "is IP Camera on": [is_ip_cam_on[0]]
                 })
                 with open(settings_file, mode='w+', encoding='utf-8') as file:
                     json.dump(settings_json, file, ensure_ascii=True, indent=4, sort_keys=False)
@@ -968,7 +1123,11 @@ class MainMenu(QMainWindow):
                     "face detect":['True'],
                     "email address": [email_address[0]],
                     "server auto start": [auto_start_server[0]],
-                    "host address": [ip[0]]
+                    "host address": [ip[0]],
+                    "IP Camera URL": [ip_cam_url[0]],
+                    "IP Camera Username": [ip_cam_usrname[0]],
+                    "IP Camera Password": [ip_cam_pswd[0]],
+                    "is IP Camera on": [is_ip_cam_on[0]]
                 })
                 with open(settings_file, mode='w+', encoding='utf-8') as file:
                     json.dump(settings_json, file, ensure_ascii=True, indent=4, sort_keys=False)
@@ -988,7 +1147,11 @@ class MainMenu(QMainWindow):
                     "face detect":['False'],
                     "email address": [email_address[0]],
                     "server auto start": [auto_start_server[0]],
-                    "host address": [ip[0]]
+                    "host address": [ip[0]],
+                    "IP Camera URL": [ip_cam_url[0]],
+                    "IP Camera Username": [ip_cam_usrname[0]],
+                    "IP Camera Password": [ip_cam_pswd[0]],
+                    "is IP Camera on": [is_ip_cam_on[0]]
                 })
                 with open(settings_file, mode='w+', encoding='utf-8') as file:
                     json.dump(settings_json, file, ensure_ascii=True, indent=4, sort_keys=False)
@@ -1010,7 +1173,11 @@ class MainMenu(QMainWindow):
                     "face detect":['False'],
                     "email address": [email_address[0]],
                     "server auto start": [auto_start_server[0]],
-                    "host address": [ip[0]]
+                    "host address": [ip[0]],
+                    "IP Camera URL": [ip_cam_url[0]],
+                    "IP Camera Username": [ip_cam_usrname[0]],
+                    "IP Camera Password": [ip_cam_pswd[0]],
+                    "is IP Camera on": [is_ip_cam_on[0]]
                 })
                 with open(settings_file, mode='w+', encoding='utf-8') as file:
                     json.dump(settings_json, file, ensure_ascii=True, indent=4, sort_keys=False)
@@ -1030,10 +1197,68 @@ class MainMenu(QMainWindow):
                     "face detect":['True'],
                     "email address": [email_address[0]],
                     "server auto start": [auto_start_server[0]],
-                    "host address": [ip[0]]
+                    "host address": [ip[0]],
+                    "IP Camera URL": [ip_cam_url[0]],
+                    "IP Camera Username": [ip_cam_usrname[0]],
+                    "IP Camera Password": [ip_cam_pswd[0]],
+                    "is IP Camera on": [is_ip_cam_on[0]]
                 })
                 with open(settings_file, mode='w+', encoding='utf-8') as file:
                     json.dump(settings_json, file, ensure_ascii=True, indent=4, sort_keys=False)
+        if name == 'IP Cam':
+            if b.isChecked() == True:
+                QMessageBox.information(self, "Attention", "If the IP Camera doesn't connect automaticly,\ntry restarting the program.\nIf it still doesn't work, your Camera URL isn't correct.", QMessageBox.Ok, QMessageBox.Ok)
+                settings_json.pop(0)
+                settings_json.append({
+                    "saved color": [saved_color[0], saved_color[1], saved_color[2]],
+                    "capture screen": [cap_screen[0]],
+                    "record video": [record_video[0]],
+                    "smiley face": [smiley_face[0]],
+                    "dark mode": [dark_mode[0]],
+                    "send email": [send_email[0]],
+                    "email delay": [email_delay[0]],
+                    "picture delay": [picture_delay[0]],
+                    "selected data index": [selected_data_index[0]],
+                    "face detect":[face_detect[0]],
+                    "email address": [email_address[0]],
+                    "server auto start": [auto_start_server[0]],
+                    "host address": [ip[0]],
+                    "IP Camera URL": [ip_cam_url[0]],
+                    "IP Camera Username": [ip_cam_usrname[0]],
+                    "IP Camera Password": [ip_cam_pswd[0]],
+                    "is IP Camera on": ['True']
+                })
+                with open(settings_file, mode='w+', encoding='utf-8') as file:
+                    json.dump(settings_json, file, ensure_ascii=True, indent=4, sort_keys=False)
+                # else: self.IpCam.setChecked(True if is_ip_cam_on[0] == 'True' else False); return
+                if get_cam_image() == False: 
+                    QMessageBox.information(self, "Attention", "IP/URL is incorrect.", QMessageBox.Ok, QMessageBox.Ok)
+                    self.open_add_usr_pass_menu()
+            else:
+                QMessageBox.information(self, "Attention", "If the Local Camera doesn't connect automaticly,\ntry restarting the program.", QMessageBox.Ok, QMessageBox.Ok)
+                settings_json.pop(0)
+                settings_json.append({
+                        "saved color": [saved_color[0], saved_color[1], saved_color[2]],
+                        "capture screen": [cap_screen[0]],
+                        "record video": [record_video[0]],
+                        "smiley face": [smiley_face[0]],
+                        "dark mode": [dark_mode[0]],
+                        "send email": [send_email[0]],
+                        "email delay": [email_delay[0]],
+                        "picture delay": [picture_delay[0]],
+                        "selected data index": [selected_data_index[0]],
+                        "face detect":[face_detect[0]],
+                        "email address": [email_address[0]],
+                        "server auto start": [auto_start_server[0]],
+                        "host address": [ip[0]],
+                        "IP Camera URL": [ip_cam_url[0]],
+                        "IP Camera Username": [ip_cam_usrname[0]],
+                        "IP Camera Password": [ip_cam_pswd[0]],
+                        "is IP Camera on": ["False"]
+                })
+                with open(settings_file, mode='w+', encoding='utf-8') as file:
+                    json.dump(settings_json, file, ensure_ascii=True, indent=4, sort_keys=False)
+            
         with open(settings_file) as file:
             saved_color.clear()
             send_email.clear()
@@ -1046,6 +1271,10 @@ class MainMenu(QMainWindow):
             face_detect.clear()
             email_address.clear()
             auto_start_server.clear()
+            ip_cam_url.clear()
+            ip_cam_usrname.clear()
+            ip_cam_pswd.clear()
+            is_ip_cam_on.clear()
             ip.clear()
             settings_json = json.load(file)
             for info in settings_json:
@@ -1062,8 +1291,14 @@ class MainMenu(QMainWindow):
                 for picture in info['picture delay']: picture_delay.append(picture)
                 for autostart in info['server auto start']: auto_start_server.append(autostart)
                 for ipaddress in info['host address']: ip.append(ipaddress)
+                for ipcamurl in info['IP Camera URL']: ip_cam_url.append(ipcamurl)
+                for ipcamusr in info['IP Camera Username']: ip_cam_usrname.append(ipcamusr)
+                for ipcampsrw in info['IP Camera Password']: ip_cam_pswd.append(ipcampsrw)
+                for ipcamison in info ['is IP Camera on']: is_ip_cam_on.append(ipcamison)
+    
+            # button = QMessageBox.information(self, "Attention", "That URL didn't work.\n\nTry the URL to the direct image,", QMessageBox.Ok, QMessageBox.Ok)
     def auto_start(self):
-        global auto_start_server, ip, saved_color, send_email, cap_screen, record_video, smiley_face, dark_mode, email_delay, picture_delay, saved_color, settings_json, selected_data_index, face_detect, email_address
+        global auto_start_server, ip, saved_color, send_email, cap_screen, record_video, smiley_face, dark_mode, email_delay, picture_delay, saved_color, settings_json, selected_data_index, face_detect, email_address, ip_cam_url, ip_cam_usrname, ip_cam_pswd, is_ip_cam_on
         button = QMessageBox.information(self, "Attention", "You must restart the program for this effect to take place.\n\n Are you sure you want to continue?", QMessageBox.Yes | QMessageBox.No, QMessageBox.Yes)
         if button == QMessageBox.Yes:        
             checked = str(self.autoStartServer.isChecked())
@@ -1073,7 +1308,7 @@ class MainMenu(QMainWindow):
             settings_json.pop(0)
             settings_json.append({
                 "saved color": [saved_color[0], saved_color[1], saved_color[2]],
-                "capture screen": ["True"],
+                "capture screen": [cap_screen[0]],
                 "record video": [record_video[0]],
                 "smiley face": [smiley_face[0]],
                 "dark mode": [dark_mode[0]],
@@ -1084,7 +1319,11 @@ class MainMenu(QMainWindow):
                 "face detect":[face_detect[0]],
                 "email address": [email_address[0]],
                 "server auto start": [checked],
-                "host address": [ip[0]]
+                "host address": [ip[0]],
+                "IP Camera URL": [ip_cam_url[0]],
+                "IP Camera Username": [ip_cam_usrname[0]],
+                "IP Camera Password": [ip_cam_pswd[0]],
+                "is IP Camera on": [is_ip_cam_on[0]]
             })
             with open(settings_file, mode='w+', encoding='utf-8') as file:
                 json.dump(settings_json, file, ensure_ascii=True, indent=4, sort_keys=False)
@@ -1100,6 +1339,10 @@ class MainMenu(QMainWindow):
                 face_detect.clear()
                 email_address.clear()
                 auto_start_server.clear()
+                ip_cam_url.clear()
+                ip_cam_usrname.clear()
+                ip_cam_pswd.clear()
+                is_ip_cam_on.clear()
                 ip.clear()
                 settings_json = json.load(file)
                 for info in settings_json:
@@ -1116,10 +1359,15 @@ class MainMenu(QMainWindow):
                     for picture in info['picture delay']: picture_delay.append(picture)
                     for autostart in info['server auto start']: auto_start_server.append(autostart)
                     for ipaddress in info['host address']: ip.append(ipaddress)
+                    for ipcamurl in info['IP Camera URL']: ip_cam_url.append(ipcamurl)
+                    for ipcamusr in info['IP Camera Username']: ip_cam_usrname.append(ipcamusr)
+                    for ipcampsrw in info['IP Camera Password']: ip_cam_pswd.append(ipcampsrw)
+                    for ipcamison in info ['is IP Camera on']: is_ip_cam_on.append(ipcamison)
         else:        
             self.autoStartServer.setChecked(True if auto_start_server[0] == 'True' else False)
             return
-        exit_handler()
+        # exit_handler()
+        self.close()
     def visitServer(self):
         a_website = "http://" + str(ip[0]) + ":5000"
         webbrowser.open_new(a_website)
@@ -1132,29 +1380,39 @@ class Thread(QThread):
             counter = 0
             n = 0
             while running:
-                global outputFrame, ret, isTimeToSendEmail
+                global outputFrame, frame, isTimeToSendEmail, rgbImage, is_ip_cam_working
                 counter+=1
                 try:
                     isTimeToSendEmail = camera.timeToSend
-                    if running: ret, frame = camera.camRun()
+                    if running: frame = camera.camRun()
                 except:
                     n += 1
                     if n >= 2: exit_handler()
-                if ret:
+                try:
                     rgbImage = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
                     h, w, ch = rgbImage.shape
                     bytesPerLine = ch * w
                     convertToQtFormat = QImage(rgbImage.data, w, h, bytesPerLine, QImage.Format_RGB888)
                     self.changePixmap.emit(convertToQtFormat)
+                except:
+                    print('Error getting camera')
+                    is_ip_cam_working = False
+                    image = QImage('404.png')
+                    self.changePixmap.emit(image)
+                    # break
                 if (time.time() - start_time) > x :
                     global framesPerSecond
                     framesPerSecond = counter / (time.time() - start_time)
                     counter = 0
                     start_time = time.time()
                 with lock:
-                    outputFrame = frame.copy()
-                    outputFrame = imutils.resize(outputFrame, width=360)
-    except: unning = False
+                    try:
+                        outputFrame = frame.copy()
+                        outputFrame = imutils.resize(outputFrame, width=360)
+                    except:
+                        is_ip_cam_working = False
+                        print('cant read image')
+    except: running = False
     finally: running = False
 @appWeb.route("/")
 def index():
@@ -1390,7 +1648,7 @@ class CycleMenu(QMainWindow):
             for info in cycles_json:
                 for c in info['cycles']: cycles = int(c)
                 for on in info['always on']: alwaysOn.append(on)
-                for OnTo in info['OnTo']: nToList.append(OnTo)
+                for OnTo in info['OnTo']: OnToList.append(OnTo)
                 for OnFrom in info['OnFrom']: OnFromList.append(OnFrom)
                 for OffTo in info['OffTo']: OffToList.append(OffTo)
                 for OffFrom in info['OffFrom']: OffFromList.append(OffFrom)
@@ -1454,6 +1712,95 @@ class CycleMenu(QMainWindow):
                 return
         self.delete_save_saveCycles()
         self.close()
+class IpCamLogin(QWidget):
+    def __init__(self, parent = None):
+        super(IpCamLogin, self).__init__(parent)
+        self.setWindowTitle('IP Camera')
+        self.grid = QGridLayout()
+
+        self.textURL = QLineEdit(ip_cam_url[0], self)
+        self.textUserName = QLineEdit(ip_cam_usrname[0], self)
+        self.textPassword = QLineEdit(ip_cam_pswd[0], self)
+        
+        self.lblURL = QLabel('URL:',self)
+        self.lblUsrname = QLabel('Username:',self)
+        self.lblpswrd = QLabel('Password:',self)
+        
+        self.btnSubmit = QPushButton('Submit', self)
+        self.btnSubmit.clicked.connect(self.submit)
+        
+        self.grid.addWidget(self.lblURL,0,0)
+        self.grid.addWidget(self.textURL,1,0)
+        self.grid.addWidget(self.lblUsrname,2,0)
+        self.grid.addWidget(self.textUserName,3,0)
+        self.grid.addWidget(self.lblpswrd,4,0)
+        self.grid.addWidget(self.textPassword,5,0)
+        self.grid.addWidget(self.btnSubmit,6,0)
+        self.horiz = QHBoxLayout(self)
+        self.horiz.addLayout(self.grid)
+        self.setLayout(self.horiz)
+    def submit(self):
+        global saved_color, auto_start_server, ip, send_email, cap_screen, record_video, smiley_face, dark_mode, email_delay, picture_delay, saved_color, settings_json, button_css, selected_data_index, face_detect, email_address, ip_cam_url, ip_cam_usrname, ip_cam_pswd, is_ip_cam_on
+        settings_json.pop(0)
+        settings_json.append({
+            "saved color": [saved_color[0], saved_color[1], saved_color[2]],
+            "capture screen": [cap_screen[0]],
+            "record video": [record_video[0]],
+            "smiley face": [smiley_face[0]],
+            "dark mode": [dark_mode[0]],
+            "send email": [send_email[0]],
+            "email delay": [email_delay[0]],
+            "picture delay": [picture_delay[0]],
+            "selected data index": [selected_data_index[0]],
+            "face detect":[face_detect[0]],
+            "email address": [email_address[0]],
+            "server auto start": [auto_start_server[0]],
+            "host address": [ip[0]],
+            "IP Camera URL": [self.textURL.text()],
+            "IP Camera Username": [self.textUserName.text()],
+            "IP Camera Password": [self.textPassword.text()],
+            "is IP Camera on": [is_ip_cam_on[0]]
+        })
+        with open(settings_file, mode='w+', encoding='utf-8') as file: json.dump(settings_json, file, ensure_ascii=True, indent=4, sort_keys=False)
+        with open(settings_file) as file:
+            saved_color.clear()
+            send_email.clear()
+            cap_screen.clear()
+            record_video.clear()
+            smiley_face.clear()
+            dark_mode.clear()
+            email_delay.clear()
+            picture_delay.clear()
+            selected_data_index.clear()
+            face_detect.clear()
+            email_address.clear()
+            auto_start_server.clear()
+            ip_cam_url.clear()
+            ip_cam_usrname.clear()
+            ip_cam_pswd.clear()
+            is_ip_cam_on.clear()
+            ip.clear()
+            settings_json = json.load(file)
+            for info in settings_json:
+                for ind in info['selected data index']: selected_data_index.append(ind)
+                for dark in info['dark mode']: dark_mode.append(dark)
+                for face in info['face detect']: face_detect.append(face)
+                for color in info['saved color']: saved_color.append(color)
+                for video in info['record video']: record_video.append(video)
+                for smile in info['smiley face']: smiley_face.append(smile)
+                for email in info['email address']: email_address.append(email)
+                for screen in info['capture screen']: cap_screen.append(screen)
+                for email_b in info['send email']: send_email.append(email_b)
+                for email_d in info['email delay']: email_delay.append(email_d)
+                for picture in info['picture delay']: picture_delay.append(picture)
+                for autostart in info['server auto start']: auto_start_server.append(autostart)
+                for ipaddress in info['host address']: ip.append(ipaddress)
+                for ipcamurl in info['IP Camera URL']: ip_cam_url.append(ipcamurl)
+                for ipcamusr in info['IP Camera Username']: ip_cam_usrname.append(ipcamusr)
+                for ipcampsrw in info['IP Camera Password']: ip_cam_pswd.append(ipcampsrw)
+            for ipcamison in info ['is IP Camera on']: is_ip_cam_on.append(ipcamison)
+        # exit_handler()
+        self.close()
 def exit_handler():
     running = False
     camera.end_cam()
@@ -1463,6 +1810,21 @@ def exit_handler():
 def start_server():
     appWeb.run(host=str(ip[0]), port='5000', debug=True, threaded=True, use_reloader=False)
     threading.Thread(target=generate).start()
+def get_cam_image():
+    global ip_cam_url, ip_cam_usrname, ip_cam_pswd, is_ip_cam_on
+    url = ip_cam_url[0]
+    username = ip_cam_usrname[0]
+    password = ip_cam_pswd[0]
+    filename = 'Pics/video_feed.jpg'
+    try:
+        r = requests.get(url, auth=(username,password))
+        if r.status_code == 200:
+            with open(filename, 'wb') as out: 
+                for bits in r.iter_content(): out.write(bits)
+        return True
+    except Exception as e:
+        print('1819' + e)
+        return False 
 if __name__ == '__main__':
     atexit.register(exit_handler)
     if not os.path.exists('Pics'): os.mkdir('Pics')
@@ -1523,13 +1885,17 @@ if __name__ == '__main__':
         "smiley face": ["False"],
         "dark mode": ["0"],
         "send email": ["False"],
-        "email delay": ["50"],
+        "email delay": ["15"],
         "picture delay": ["5"],
         "selected data index": ["7"],
         "face detect": ["True"],
         "email address": [""],
         "server auto start":["False"],
-        "host address": ["''' + str(socket.gethostbyname(socket.gethostname())) + '''"]
+        "host address": ["''' + str(socket.gethostbyname(socket.gethostname())) + '''"],
+        "is IP Camera on": ["False"],
+        "IP Camera URL": ["127.0.0.1"],
+        "IP Camera Username": ["admin"],
+        "IP Camera Password": ["password"]
     }]''')
         file.close()
     with open(settings_file) as file:
@@ -1548,6 +1914,10 @@ if __name__ == '__main__':
             for picture in info['picture delay']: picture_delay.append(picture)
             for autostart in info['server auto start']: auto_start_server.append(autostart)
             for ipaddress in info['host address']: ip.append(ipaddress)
+            for ipcamurl in info['IP Camera URL']: ip_cam_url.append(ipcamurl)
+            for ipcamusr in info['IP Camera Username']: ip_cam_usrname.append(ipcamusr)
+            for ipcampsrw in info['IP Camera Password']: ip_cam_pswd.append(ipcampsrw)
+            for ipcamison in info ['is IP Camera on']: is_ip_cam_on.append(ipcamison)
     button_css = 'background-color: rgb(' + str(saved_color[0]) + ', ' + str(saved_color[1]) + ', ' + str(saved_color[2]) + ')'
     app = QApplication(sys.argv)
     if dark_mode[0] == '1':
